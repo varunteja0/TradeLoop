@@ -35,6 +35,7 @@ export default function Upload() {
         });
         setResult(data);
         toast(`${data.imported} trades imported successfully!`, "success");
+        setTimeout(() => navigate("/dashboard"), 1500);
       } catch (err: unknown) {
         const msg =
           (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||

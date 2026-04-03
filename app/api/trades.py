@@ -112,6 +112,30 @@ async def update_trade(trade_id: str, body: dict, db: AsyncSession = Depends(get
     return {"status": "updated", "trade_id": trade_id}
 
 
+@router.post("/load-sample")
+async def load_sample_data(
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Load sample trades so users can explore the dashboard immediately."""
+    import os
+    sample_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "sample_trades.csv")
+    if not os.path.exists(sample_path):
+        raise HTTPException(status_code=404, detail="Sample data not available")
+
+    with open(sample_path, "r") as f:
+        content = f.read()
+
+    try:
+        result = await trade_service.upload_csv(db, user, content, broker="auto")
+    except (ValueError, PermissionError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    background_tasks.add_task(run_post_upload, user.id)
+    return {"status": "ok", "imported": result.imported, "message": f"Loaded {result.imported} sample trades. Explore your dashboard!"}
+
+
 @router.get("/export")
 async def export_trades(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     csv_content = await trade_service.export_csv(db, user)

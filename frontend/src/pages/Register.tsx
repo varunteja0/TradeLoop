@@ -25,7 +25,8 @@ export default function Register() {
     }
     try {
       await register(email, password, name || undefined);
-      navigate("/upload");
+      localStorage.setItem("tradeloop_registered_at", Date.now().toString());
+      navigate("/dashboard");
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
