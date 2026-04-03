@@ -27,6 +27,16 @@ APP_VERSION = "4.0.0"
 limiter = Limiter(key_func=get_remote_address)
 
 
+sentry_dsn = getattr(settings, 'sentry_dsn', '')
+if sentry_dsn:
+    try:
+        import sentry_sdk
+        sentry_sdk.init(dsn=sentry_dsn, traces_sample_rate=0.1, environment=settings.environment)
+        logger.info("Sentry initialized")
+    except ImportError:
+        logger.warning("sentry-sdk not installed, error tracking disabled")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("TradeLoop v%s starting up (env=%s)", APP_VERSION, settings.environment)
@@ -62,6 +72,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    if settings.environment == "production":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
 
 
 @app.middleware("http")

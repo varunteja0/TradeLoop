@@ -80,6 +80,12 @@ class AnalyticsService:
             logger.info("Cache hit for full analytics: %s", user.email)
             return cached
 
+        if len(trades) > 10000:
+            logger.warning(
+                "User %s has %d trades — analytics computation may use significant memory",
+                user.email, len(trades),
+            )
+
         t0 = time.time()
         result = self._analytics.compute_all(trades, tz_offset_hours=tz_offset)
         data = asdict(result)

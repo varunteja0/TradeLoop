@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Query, status
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +13,7 @@ from app.db import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.schemas.trade import TradeOut, TradeListResponse, UploadResponse
+from app.services.background import run_post_upload
 from app.services.trade_service import TradeService
 
 router = APIRouter(prefix="/trades", tags=["trades"])
@@ -25,6 +26,7 @@ UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]
 async def upload_csv(
     file: UploadFile = File(...),
     broker: str = Query("auto"),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -46,6 +48,8 @@ async def upload_csv(
         raise HTTPException(status_code=400, detail=str(e))
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
+
+    background_tasks.add_task(run_post_upload, user.id)
 
     return UploadResponse(imported=result.imported, skipped=result.skipped, errors=result.errors)
 

@@ -5,7 +5,7 @@ import hmac
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,9 +19,16 @@ logger = logging.getLogger("tradeloop.payments")
 router = APIRouter(tags=["payments"])
 
 PLAN_LIMITS = {
-    "free": {"trades": 50, "features": ["basic_analytics"]},
-    "pro": {"trades": None, "features": ["basic_analytics", "advanced_analytics", "behavior_alerts", "export"]},
+    "free": {"trades": 50, "features": ["basic_analytics", "csv_upload"]},
+    "pro": {"trades": None, "price_inr": 99900, "features": ["basic_analytics", "csv_upload", "advanced_analytics", "behavior_alerts", "export", "broker_sync", "insights", "weekly_reports"]},
+    "prop_trader": {"trades": None, "price_inr": 149900, "features": ["basic_analytics", "csv_upload", "advanced_analytics", "behavior_alerts", "export", "broker_sync", "insights", "weekly_reports", "prop_compliance", "multi_account", "real_time_alerts"]},
 }
+
+PAID_PLANS = {"pro", "prop_trader"}
+
+
+class CreateOrderRequest(BaseModel):
+    plan: str
 
 
 class CreateOrderResponse(BaseModel):
@@ -35,6 +42,7 @@ class VerifyPaymentRequest(BaseModel):
     razorpay_order_id: str
     razorpay_payment_id: str
     razorpay_signature: str
+    plan: str
 
 
 class VerifyPaymentResponse(BaseModel):
@@ -51,19 +59,26 @@ class PaymentStatusResponse(BaseModel):
 
 @router.post("/payments/create-order", response_model=CreateOrderResponse)
 async def create_order(
+    body: CreateOrderRequest,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     settings = get_settings()
 
-    if user.plan == "pro":
-        raise HTTPException(status_code=400, detail="You are already on the Pro plan")
+    if body.plan not in PAID_PLANS:
+        raise HTTPException(status_code=400, detail=f"Invalid plan. Must be one of: {', '.join(sorted(PAID_PLANS))}")
+
+    if user.plan == body.plan:
+        raise HTTPException(status_code=400, detail=f"You are already on the {body.plan} plan")
+
+    plan_info = PLAN_LIMITS[body.plan]
+    amount = plan_info["price_inr"]
 
     if not settings.razorpay_key_id or not settings.razorpay_key_secret:
         logger.warning("Razorpay keys not configured — returning mock order (dev mode)")
         return CreateOrderResponse(
             order_id="order_dev_mock_123",
-            amount=settings.pro_plan_price_paise,
+            amount=amount,
             currency="INR",
             key_id="rzp_test_dev_mock",
         )
@@ -76,9 +91,9 @@ async def create_order(
                 "https://api.razorpay.com/v1/orders",
                 auth=(settings.razorpay_key_id, settings.razorpay_key_secret),
                 json={
-                    "amount": settings.pro_plan_price_paise,
+                    "amount": amount,
                     "currency": "INR",
-                    "receipt": f"tradeloop_{user.id}",
+                    "receipt": f"tradeloop_{user.id}_{body.plan}",
                 },
                 timeout=15.0,
             )
@@ -107,12 +122,15 @@ async def verify_payment(
 ):
     settings = get_settings()
 
+    if body.plan not in PAID_PLANS:
+        raise HTTPException(status_code=400, detail=f"Invalid plan. Must be one of: {', '.join(sorted(PAID_PLANS))}")
+
     if not settings.razorpay_key_id or not settings.razorpay_key_secret:
         logger.warning("Razorpay keys not configured — accepting payment in dev mode")
-        user.plan = "pro"
+        user.plan = body.plan
         await db.commit()
         await db.refresh(user)
-        return VerifyPaymentResponse(verified=True, plan="pro", message="Dev mode — payment accepted")
+        return VerifyPaymentResponse(verified=True, plan=body.plan, message=f"Dev mode — upgraded to {body.plan}")
 
     expected_signature = hmac.new(
         settings.razorpay_key_secret.encode(),
@@ -124,12 +142,12 @@ async def verify_payment(
         logger.warning("Invalid payment signature for user %s", user.id)
         raise HTTPException(status_code=400, detail="Payment verification failed")
 
-    user.plan = "pro"
+    user.plan = body.plan
     await db.commit()
     await db.refresh(user)
-    logger.info("User %s upgraded to pro (payment_id=%s)", user.id, body.razorpay_payment_id)
+    logger.info("User %s upgraded to %s (payment_id=%s)", user.id, body.plan, body.razorpay_payment_id)
 
-    return VerifyPaymentResponse(verified=True, plan="pro", message="Payment verified — upgraded to Pro")
+    return VerifyPaymentResponse(verified=True, plan=body.plan, message=f"Payment verified — upgraded to {body.plan}")
 
 
 @router.get("/payments/status", response_model=PaymentStatusResponse)

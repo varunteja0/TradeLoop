@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     razorpay_key_id: str = ""
     razorpay_key_secret: str = ""
     pro_plan_price_paise: int = 99900  # ₹999
+    resend_api_key: str = ""
+    sentry_dsn: str = ""
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

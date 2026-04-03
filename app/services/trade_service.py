@@ -138,12 +138,16 @@ class TradeService:
 
         return TradeListResult(trades=trades, total=total, page=page, per_page=per_page)
 
-    async def get_user_trades(self, db: AsyncSession, user: User) -> list:
+    async def get_user_trades(self, db: AsyncSession, user: User, limit: Optional[int] = None) -> list:
         """Get all trades for a user, ordered by timestamp."""
-        result = await db.execute(
-            select(Trade).where(Trade.user_id == user.id).order_by(Trade.timestamp)
-        )
-        return list(result.scalars().all())
+        query = select(Trade).where(Trade.user_id == user.id).order_by(Trade.timestamp)
+        if limit is not None:
+            query = query.limit(limit)
+        result = await db.execute(query)
+        trades = list(result.scalars().all())
+        if limit is not None and len(trades) == limit:
+            logger.warning("User %s hit trade fetch limit of %d — results may be truncated", user.email, limit)
+        return trades
 
     async def delete_trade(self, db: AsyncSession, user: User, trade_id: str) -> None:
         result = await db.execute(

@@ -48,5 +48,28 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: Run tests
+        run: npx vitest run
+
       - name: Build
         run: npx vite build
+
+  deploy-backend:
+    name: Deploy Backend
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to Railway
+        run: echo "Railway deployment configured via railway.toml — connect Railway GitHub integration"
+
+  deploy-frontend:
+    name: Deploy Frontend
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to Vercel
+        run: echo "Vercel deployment configured via vercel.json — connect Vercel GitHub integration"

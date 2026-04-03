@@ -21,7 +21,7 @@ def _utcnow() -> datetime:
 class User(Base):
     __tablename__ = "users"
     __table_args__ = (
-        CheckConstraint("plan IN ('free', 'pro', 'enterprise')", name="ck_user_plan"),
+        CheckConstraint("plan IN ('free', 'pro', 'prop_trader', 'enterprise')", name="ck_user_plan"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_uuid)

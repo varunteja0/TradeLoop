@@ -319,9 +319,13 @@ export default function Landing() {
       </main>
 
       <footer className="border-t border-border py-8 px-6">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-gray-500">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500">
           <span>TradeLoop &copy; {new Date().getFullYear()}</span>
-          <span>Built for traders who want to get better.</span>
+          <div className="flex items-center gap-4">
+            <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
+            <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
+          </div>
+          <span className="hidden sm:inline">Built for traders who want to get better.</span>
         </div>
       </footer>
     </div>

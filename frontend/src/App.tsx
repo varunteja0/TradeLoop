@@ -7,6 +7,8 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Insights = lazy(() => import("./pages/Insights"));
@@ -44,6 +46,8 @@ export default function App() {
                 <Route path="/" element={<Landing />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
+                <Route path="/privacy" element={<Privacy />} />
+                <Route path="/terms" element={<Terms />} />
                 <Route path="/demo" element={<Demo />} />
                 <Route
                   path="/dashboard"

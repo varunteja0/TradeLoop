@@ -77,6 +77,15 @@ async def check_all_compliance(user_id: str) -> None:
         await db.commit()
 
 
+async def run_post_upload(user_id: str) -> None:
+    """Run precompute + compliance outside the request cycle via BackgroundTasks."""
+    try:
+        await precompute_analytics(user_id)
+        await check_all_compliance(user_id)
+    except Exception:
+        logger.exception("Post-upload background work failed for user %s", user_id)
+
+
 def register_background_handlers() -> None:
     """Wire event handlers that trigger background work."""
 

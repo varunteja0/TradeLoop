@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
+from pydantic import EmailStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,8 +16,9 @@ from app.schemas.auth import (
     ChangePasswordRequest, UpdateProfileRequest, RefreshRequest,
 )
 from app.security import (
-    hash_password, verify_password, create_access_token,
-    create_refresh_token, decode_refresh_token, TokenError,
+    hash_password, verify_password, validate_password,
+    create_access_token, create_refresh_token,
+    decode_access_token, decode_refresh_token, TokenError,
 )
 
 logger = logging.getLogger("tradeloop.auth")
@@ -124,3 +127,44 @@ async def change_password(
     user.hashed_password = hash_password(req.new_password)
     await db.flush()
     logger.info("Password changed: %s", user.email)
+
+
+@router.post("/forgot-password")
+async def forgot_password(email: EmailStr = Body(..., embed=True), db: AsyncSession = Depends(get_db)):
+    """Send password reset email."""
+    from app.services.email_service import EmailService
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if not user:
+        return {"message": "If that email is registered, a reset link has been sent."}
+
+    reset_token = create_access_token({"sub": str(user.id), "type": "reset"}, expires_delta=timedelta(hours=1))
+    email_svc = EmailService()
+    await email_svc.send_password_reset(user.email, reset_token)
+    return {"message": "If that email is registered, a reset link has been sent."}
+
+
+@router.post("/reset-password")
+async def reset_password(token: str = Body(...), new_password: str = Body(...), db: AsyncSession = Depends(get_db)):
+    """Reset password with token from email."""
+    valid, msg = validate_password(new_password)
+    if not valid:
+        raise HTTPException(status_code=400, detail=msg)
+
+    try:
+        payload = decode_access_token(token)
+    except TokenError:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+    if payload.get("type") != "reset":
+        raise HTTPException(status_code=400, detail="Invalid token type")
+
+    user_id = payload.get("sub")
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid token")
+
+    user.hashed_password = hash_password(new_password)
+    await db.flush()
+    return {"message": "Password reset successfully"}

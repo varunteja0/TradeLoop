@@ -47,8 +47,8 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         "exp": expire,
         "iat": now,
         "jti": str(uuid.uuid4()),
-        "type": "access",
     })
+    to_encode.setdefault("type", "access")
     return jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
 
 
@@ -74,7 +74,7 @@ def decode_access_token(token: str) -> dict:
     except jwt.InvalidTokenError:
         raise TokenError("invalid")
 
-    if payload.get("type") not in ("access", None):
+    if payload.get("type") not in ("access", "reset", None):
         raise TokenError("wrong_token_type")
 
     return payload

@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.crypto import encrypt_value, decrypt_value
 from app.engine.broker_sync import OrderMatcher, normalize_zerodha_orders, normalize_angelone_orders
 from app.models.broker_connection import BrokerConnection
 from app.models.trade import Trade
@@ -39,7 +40,9 @@ class BrokerService:
             conn.is_active = False
 
         connection = BrokerConnection(
-            user_id=user.id, broker=broker, access_token=access_token, api_key=api_key,
+            user_id=user.id, broker=broker,
+            access_token=encrypt_value(access_token),
+            api_key=encrypt_value(api_key) if api_key else None,
         )
         db.add(connection)
         await db.flush()
@@ -71,7 +74,10 @@ class BrokerService:
         if not connection.is_active:
             raise PermissionError("Connection is inactive. Please reconnect.")
 
-        if not connection.access_token or connection.access_token == "test_token":
+        decrypted_token = decrypt_value(connection.access_token) if connection.access_token else ""
+        decrypted_key = decrypt_value(connection.api_key) if connection.api_key else ""
+
+        if not decrypted_token or decrypted_token == "test_token":
             broker_name = connection.broker.title()
             help_url = "console.zerodha.com" if connection.broker == "zerodha" else "smartapi.angelone.in"
             return {
@@ -120,8 +126,11 @@ class BrokerService:
     async def _fetch_orders(self, connection: BrokerConnection) -> list:
         import httpx
 
+        token = decrypt_value(connection.access_token) if connection.access_token else ""
+        key = decrypt_value(connection.api_key) if connection.api_key else ""
+
         if connection.broker == "zerodha":
-            headers = {"Authorization": f"token {connection.api_key}:{connection.access_token}"}
+            headers = {"Authorization": f"token {key}:{token}"}
             async with httpx.AsyncClient() as client:
                 resp = await client.get("https://api.kite.trade/orders", headers=headers, timeout=30.0)
             resp.raise_for_status()
@@ -129,10 +138,10 @@ class BrokerService:
 
         elif connection.broker == "angelone":
             headers = {
-                "Authorization": f"Bearer {connection.access_token}",
+                "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json",
                 "X-UserType": "USER", "X-SourceID": "WEB",
-                "X-PrivateKey": connection.api_key or "",
+                "X-PrivateKey": key,
             }
             async with httpx.AsyncClient() as client:
                 resp = await client.get(
