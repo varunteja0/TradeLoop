@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 
@@ -51,10 +51,10 @@ class UploadResponse(BaseModel):
 
 
 class AnalyticsResponse(BaseModel):
-    overview: dict
-    time_analysis: dict
-    behavioral: dict
-    symbols: dict
-    streaks: dict
-    equity_curve: dict
-    risk_metrics: dict
+    overview: Dict[str, Any]
+    time_analysis: Dict[str, Any]
+    behavioral: Dict[str, Any]
+    symbols: Dict[str, Any]
+    streaks: Dict[str, Any]
+    equity_curve: Dict[str, Any]
+    risk_metrics: Dict[str, Any]

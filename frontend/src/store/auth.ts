@@ -1,12 +1,6 @@
 import { create } from "zustand";
 import api from "../api/client";
-
-interface User {
-  id: string;
-  email: string;
-  name: string | null;
-  plan: string;
-}
+import type { User } from "../types";
 
 interface AuthState {
   user: User | null;
@@ -15,24 +9,32 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => void;
-  hydrate: () => void;
+  hydrate: () => Promise<void>;
+  refreshToken: () => Promise<void>;
+  updateProfile: (data: { name?: string; timezone_offset?: number }) => Promise<void>;
+  changePassword: (current_password: string, new_password: string) => Promise<void>;
 }
 
-export const useAuth = create<AuthState>((set) => ({
+export const useAuth = create<AuthState>((set, get) => ({
   user: null,
   token: null,
   loading: false,
 
-  hydrate: () => {
+  hydrate: async () => {
     const token = localStorage.getItem("tradeloop_token");
     const userStr = localStorage.getItem("tradeloop_user");
-    if (token && userStr) {
-      try {
-        set({ token, user: JSON.parse(userStr) });
-      } catch {
-        localStorage.removeItem("tradeloop_token");
-        localStorage.removeItem("tradeloop_user");
-      }
+    if (!token || !userStr) return;
+
+    try {
+      set({ token, user: JSON.parse(userStr) });
+      const { data } = await api.get("/auth/me");
+      set({ user: data });
+      localStorage.setItem("tradeloop_user", JSON.stringify(data));
+    } catch {
+      localStorage.removeItem("tradeloop_token");
+      localStorage.removeItem("tradeloop_refresh_token");
+      localStorage.removeItem("tradeloop_user");
+      set({ user: null, token: null });
     }
   },
 
@@ -41,6 +43,9 @@ export const useAuth = create<AuthState>((set) => ({
     try {
       const { data } = await api.post("/auth/login", { email, password });
       localStorage.setItem("tradeloop_token", data.access_token);
+      if (data.refresh_token) {
+        localStorage.setItem("tradeloop_refresh_token", data.refresh_token);
+      }
       localStorage.setItem("tradeloop_user", JSON.stringify(data.user));
       set({ user: data.user, token: data.access_token, loading: false });
     } catch (e) {
@@ -54,6 +59,9 @@ export const useAuth = create<AuthState>((set) => ({
     try {
       const { data } = await api.post("/auth/register", { email, password, name });
       localStorage.setItem("tradeloop_token", data.access_token);
+      if (data.refresh_token) {
+        localStorage.setItem("tradeloop_refresh_token", data.refresh_token);
+      }
       localStorage.setItem("tradeloop_user", JSON.stringify(data.user));
       set({ user: data.user, token: data.access_token, loading: false });
     } catch (e) {
@@ -64,7 +72,36 @@ export const useAuth = create<AuthState>((set) => ({
 
   logout: () => {
     localStorage.removeItem("tradeloop_token");
+    localStorage.removeItem("tradeloop_refresh_token");
     localStorage.removeItem("tradeloop_user");
     set({ user: null, token: null });
+  },
+
+  refreshToken: async () => {
+    const refresh = localStorage.getItem("tradeloop_refresh_token");
+    if (!refresh) {
+      get().logout();
+      return;
+    }
+    try {
+      const { data } = await api.post("/auth/refresh", { refresh_token: refresh });
+      localStorage.setItem("tradeloop_token", data.access_token);
+      if (data.refresh_token) {
+        localStorage.setItem("tradeloop_refresh_token", data.refresh_token);
+      }
+      set({ token: data.access_token });
+    } catch {
+      get().logout();
+    }
+  },
+
+  updateProfile: async (profileData) => {
+    const { data } = await api.put("/auth/profile", profileData);
+    set({ user: data });
+    localStorage.setItem("tradeloop_user", JSON.stringify(data));
+  },
+
+  changePassword: async (current_password, new_password) => {
+    await api.post("/auth/change-password", { current_password, new_password });
   },
 }));

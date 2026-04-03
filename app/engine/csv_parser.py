@@ -3,7 +3,8 @@ Multi-broker CSV parser.
 
 Supports: Generic format, Zerodha tradebook, MT4/MT5 statement.
 Auto-detects format from column headers.
-Returns normalized TradeCreate objects regardless of input.
+Returns normalized TradeCreate objects regardless of input,
+along with a list of per-row error strings.
 """
 
 from __future__ import annotations
@@ -12,15 +13,27 @@ import csv
 import io
 import re
 from datetime import datetime, timezone
-from typing import Literal
+from typing import Dict, List, Literal, Optional, Tuple
 
 from app.schemas.trade import TradeCreate
 
 
 BrokerFormat = Literal["generic", "zerodha", "mt4", "auto"]
 
+MAX_FILE_SIZE: int = 5 * 1024 * 1024  # 5 MB
 
-def parse_csv(content: str, broker: BrokerFormat = "auto") -> list[TradeCreate]:
+
+def validate_csv_size(content: str) -> Optional[str]:
+    """Return an error string if *content* exceeds MAX_FILE_SIZE, else None."""
+    if len(content.encode("utf-8")) > MAX_FILE_SIZE:
+        return f"CSV content exceeds maximum allowed size of {MAX_FILE_SIZE} bytes"
+    return None
+
+
+def parse_csv(
+    content: str, broker: BrokerFormat = "auto"
+) -> Tuple[List[TradeCreate], List[str]]:
+    """Parse *content* and return ``(trades, errors)``."""
     if broker == "auto":
         broker = _detect_format(content)
 
@@ -44,7 +57,7 @@ def _detect_format(content: str) -> BrokerFormat:
     return "generic"
 
 
-def _parse_generic(content: str) -> list[TradeCreate]:
+def _parse_generic(content: str) -> Tuple[List[TradeCreate], List[str]]:
     """
     Expected columns (flexible naming):
     date/timestamp, symbol, side/direction, entry_price, exit_price, quantity/size, pnl/profit
@@ -52,15 +65,18 @@ def _parse_generic(content: str) -> list[TradeCreate]:
     """
     reader = csv.DictReader(io.StringIO(content))
     if reader.fieldnames is None:
-        return []
+        return [], []
 
     col_map = _build_column_map(reader.fieldnames)
-    trades = []
+    trades: List[TradeCreate] = []
+    errors: List[str] = []
 
-    for row in reader:
+    for row_num, row in enumerate(reader, start=2):
         try:
-            ts = _parse_timestamp(row.get(col_map.get("timestamp", ""), ""))
+            raw_ts = row.get(col_map.get("timestamp", ""), "")
+            ts = _parse_timestamp(raw_ts)
             if ts is None:
+                errors.append(f"Row {row_num}: invalid timestamp '{raw_ts}'")
                 continue
 
             pnl_raw = row.get(col_map.get("pnl", ""), "0")
@@ -75,7 +91,7 @@ def _parse_generic(content: str) -> list[TradeCreate]:
 
             symbol = row.get(col_map.get("symbol", ""), "UNKNOWN").strip().upper()
 
-            duration = None
+            duration: Optional[float] = None
             if "duration" in col_map:
                 dur_val = row.get(col_map["duration"], "")
                 if dur_val:
@@ -101,27 +117,29 @@ def _parse_generic(content: str) -> list[TradeCreate]:
                 notes=notes if notes else None,
                 fees=fees,
             ))
-        except (ValueError, KeyError):
+        except (ValueError, KeyError) as exc:
+            errors.append(f"Row {row_num}: {exc}")
             continue
 
-    return trades
+    return trades, errors
 
 
-def _parse_zerodha(content: str) -> list[TradeCreate]:
+def _parse_zerodha(content: str) -> Tuple[List[TradeCreate], List[str]]:
     """
     Zerodha Console tradebook export format:
     trade_date, tradingsymbol, exchange, segment, trade_type, quantity, price, order_id, ...
-    
+
     Zerodha exports individual legs, so we pair BUY/SELL for same symbol on same day.
+    The leg that occurs first determines whether the trade is long (BUY first) or
+    short (SELL first).  PnL is computed accordingly.
     """
     reader = csv.DictReader(io.StringIO(content))
     if reader.fieldnames is None:
-        return []
+        return [], []
 
-    cols = [c.strip().lower() for c in reader.fieldnames]
     rows = list(reader)
 
-    daily_trades: dict[str, list[dict]] = {}
+    daily_trades: Dict[str, List[dict]] = {}
     for row in rows:
         row = {k.strip().lower(): v.strip() for k, v in row.items()}
         key = f"{row.get('trade_date', '')}-{row.get('tradingsymbol', '')}"
@@ -129,8 +147,8 @@ def _parse_zerodha(content: str) -> list[TradeCreate]:
             daily_trades[key] = []
         daily_trades[key].append(row)
 
-    trades = []
-    processed = set()
+    trades: List[TradeCreate] = []
+    errors: List[str] = []
 
     for key, group in daily_trades.items():
         buys = [r for r in group if r.get("trade_type", "").upper() == "BUY"]
@@ -142,20 +160,48 @@ def _parse_zerodha(content: str) -> list[TradeCreate]:
             sell = sells[i]
 
             try:
-                ts = _parse_timestamp(buy.get("trade_date", ""))
+                buy_ts = _parse_timestamp(buy.get("trade_date", ""))
+                sell_ts = _parse_timestamp(sell.get("trade_date", ""))
+
+                buy_time = _parse_timestamp(buy.get("order_execution_time", buy.get("trade_date", "")))
+                sell_time = _parse_timestamp(sell.get("order_execution_time", sell.get("trade_date", "")))
+
+                if buy_time is None and sell_time is None:
+                    first_idx_buy = group.index(buy)
+                    first_idx_sell = group.index(sell)
+                    buy_first = first_idx_buy < first_idx_sell
+                elif buy_time is None:
+                    buy_first = False
+                elif sell_time is None:
+                    buy_first = True
+                else:
+                    buy_first = buy_time <= sell_time
+
+                ts = buy_ts or sell_ts
                 if ts is None:
+                    errors.append(f"Zerodha group '{key}' pair {i}: invalid timestamp")
                     continue
 
-                symbol = buy.get("tradingsymbol", "UNKNOWN").upper()
-                entry_price = _parse_float(buy.get("price", "0"))
-                exit_price = _parse_float(sell.get("price", "0"))
+                symbol = buy.get("tradingsymbol", sell.get("tradingsymbol", "UNKNOWN")).upper()
+                buy_price = _parse_float(buy.get("price", "0"))
+                sell_price = _parse_float(sell.get("price", "0"))
                 qty = _parse_float(buy.get("quantity", "1"))
-                pnl = (exit_price - entry_price) * qty
+
+                if buy_first:
+                    side = "BUY"
+                    entry_price = buy_price
+                    exit_price = sell_price
+                    pnl = (exit_price - entry_price) * qty
+                else:
+                    side = "SELL"
+                    entry_price = sell_price
+                    exit_price = buy_price
+                    pnl = (entry_price - exit_price) * qty
 
                 trades.append(TradeCreate(
                     timestamp=ts,
                     symbol=symbol,
-                    side="BUY",
+                    side=side,
                     entry_price=entry_price,
                     exit_price=exit_price,
                     quantity=qty,
@@ -165,32 +211,38 @@ def _parse_zerodha(content: str) -> list[TradeCreate]:
                     notes=None,
                     fees=0,
                 ))
-            except (ValueError, KeyError):
+            except (ValueError, KeyError) as exc:
+                errors.append(f"Zerodha group '{key}' pair {i}: {exc}")
                 continue
 
-    return trades
+    return trades, errors
 
 
-def _parse_mt4(content: str) -> list[TradeCreate]:
+def _parse_mt4(content: str) -> Tuple[List[TradeCreate], List[str]]:
     """
     MT4/MT5 CSV statement export:
     Ticket, Open Time, Close Time, Type, Size, Symbol, Open Price, Close Price, Commission, Swap, Profit
     """
     reader = csv.DictReader(io.StringIO(content))
     if reader.fieldnames is None:
-        return []
+        return [], []
 
-    trades = []
-    for row in reader:
+    trades: List[TradeCreate] = []
+    errors: List[str] = []
+
+    for row_num, row in enumerate(reader, start=2):
         row_clean = {k.strip().lower(): v.strip() for k, v in row.items()}
         try:
             trade_type = row_clean.get("type", "").lower()
             if trade_type not in ("buy", "sell"):
                 continue
 
-            open_time = _parse_timestamp(row_clean.get("open time", row_clean.get("opentime", "")))
-            close_time = _parse_timestamp(row_clean.get("close time", row_clean.get("closetime", "")))
+            raw_open = row_clean.get("open time", row_clean.get("opentime", ""))
+            open_time = _parse_timestamp(raw_open)
+            raw_close = row_clean.get("close time", row_clean.get("closetime", ""))
+            close_time = _parse_timestamp(raw_close)
             if open_time is None:
+                errors.append(f"Row {row_num}: invalid open time '{raw_open}'")
                 continue
 
             symbol = row_clean.get("symbol", row_clean.get("item", "UNKNOWN")).upper()
@@ -203,7 +255,7 @@ def _parse_mt4(content: str) -> list[TradeCreate]:
             profit = _parse_float(row_clean.get("profit", "0"))
             pnl = profit + commission + swap
 
-            duration = None
+            duration: Optional[float] = None
             if open_time and close_time:
                 duration = (close_time - open_time).total_seconds() / 60
 
@@ -220,15 +272,16 @@ def _parse_mt4(content: str) -> list[TradeCreate]:
                 notes=None,
                 fees=abs(commission) + abs(swap),
             ))
-        except (ValueError, KeyError):
+        except (ValueError, KeyError) as exc:
+            errors.append(f"Row {row_num}: {exc}")
             continue
 
-    return trades
+    return trades, errors
 
 
 # ========================= HELPERS =========================
 
-COLUMN_ALIASES = {
+COLUMN_ALIASES: Dict[str, List[str]] = {
     "timestamp": ["date", "timestamp", "time", "datetime", "trade_date", "open_time", "entry_time"],
     "symbol": ["symbol", "ticker", "instrument", "tradingsymbol", "pair", "asset"],
     "side": ["side", "direction", "type", "trade_type", "action", "buy_sell"],
@@ -243,10 +296,10 @@ COLUMN_ALIASES = {
 }
 
 
-def _build_column_map(headers: list[str]) -> dict[str, str]:
+def _build_column_map(headers: List[str]) -> Dict[str, str]:
     """Map our canonical field names to actual CSV column names."""
     normalized = {h.strip().lower().replace(" ", "_"): h for h in headers}
-    mapping = {}
+    mapping: Dict[str, str] = {}
 
     for field, aliases in COLUMN_ALIASES.items():
         for alias in aliases:
@@ -257,29 +310,38 @@ def _build_column_map(headers: list[str]) -> dict[str, str]:
     return mapping
 
 
-def _parse_timestamp(value: str) -> datetime | None:
+# Date format order:
+#   1. ISO / unambiguous formats first (YYYY-prefixed).
+#   2. Ambiguous day-first (dd/mm) before month-first (mm/dd).
+#      This matches the Indian market convention (Zerodha, NSE, BSE).
+_TIMESTAMP_FORMATS: List[str] = [
+    # ISO / unambiguous (year first)
+    "%Y-%m-%dT%H:%M:%S%z",
+    "%Y-%m-%dT%H:%M:%SZ",
+    "%Y-%m-%dT%H:%M:%S",
+    "%Y-%m-%d %H:%M:%S",
+    "%Y-%m-%d %H:%M",
+    "%Y-%m-%d",
+    "%Y.%m.%d %H:%M:%S",
+    "%Y.%m.%d %H:%M",
+    # Unambiguous day-first with dashes
+    "%d-%m-%Y %H:%M:%S",
+    "%d-%m-%Y",
+    # Ambiguous slash-separated — dd/mm before mm/dd (Indian market preference)
+    "%d/%m/%Y %H:%M:%S",
+    "%d/%m/%Y",
+    "%m/%d/%Y %H:%M:%S",
+    "%m/%d/%Y",
+]
+
+
+def _parse_timestamp(value: str) -> Optional[datetime]:
     if not value or not value.strip():
         return None
 
     value = value.strip()
-    formats = [
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%d %H:%M",
-        "%Y-%m-%dT%H:%M:%S",
-        "%Y-%m-%dT%H:%M:%SZ",
-        "%Y-%m-%dT%H:%M:%S%z",
-        "%Y-%m-%d",
-        "%d-%m-%Y %H:%M:%S",
-        "%d-%m-%Y",
-        "%d/%m/%Y %H:%M:%S",
-        "%d/%m/%Y",
-        "%m/%d/%Y %H:%M:%S",
-        "%m/%d/%Y",
-        "%Y.%m.%d %H:%M:%S",
-        "%Y.%m.%d %H:%M",
-    ]
 
-    for fmt in formats:
+    for fmt in _TIMESTAMP_FORMATS:
         try:
             dt = datetime.strptime(value, fmt)
             if dt.tzinfo is None:
@@ -294,7 +356,11 @@ def _parse_timestamp(value: str) -> datetime | None:
 def _parse_float(value: str) -> float:
     if not value or not value.strip():
         return 0.0
-    cleaned = re.sub(r"[^\d.\-+eE]", "", value.strip())
+    value = value.strip()
+    # Accounting-style negatives: (500) -> -500
+    if value.startswith('(') and value.endswith(')'):
+        value = '-' + value[1:-1]
+    cleaned = re.sub(r"[^\d.\-+eE]", "", value)
     try:
         return float(cleaned)
     except ValueError:

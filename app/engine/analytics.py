@@ -12,6 +12,7 @@ import statistics
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from typing import Optional
 
 from app.models.trade import Trade
 
@@ -40,25 +41,41 @@ DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
 class TradeAnalytics:
     """Deterministic trade analytics engine. Pure math on trade data."""
 
-    def compute_all(self, trades: list[Trade]) -> FullAnalytics:
+    def compute_all(self, trades: list[Trade], tz_offset_hours: int = 0) -> FullAnalytics:
         if not trades:
             return FullAnalytics()
 
         sorted_trades = sorted(trades, key=lambda t: t.timestamp)
         return FullAnalytics(
-            overview=self.overall_metrics(sorted_trades),
-            time_analysis=self.time_analysis(sorted_trades),
+            overview=self.overall_metrics(sorted_trades, tz_offset_hours=tz_offset_hours),
+            time_analysis=self.time_analysis(sorted_trades, tz_offset_hours=tz_offset_hours),
             behavioral=self.behavioral_analysis(sorted_trades),
             symbols=self.symbol_analysis(sorted_trades),
             streaks=self.streak_analysis(sorted_trades),
-            equity_curve=self.equity_curve_data(sorted_trades),
-            risk_metrics=self.risk_metrics(sorted_trades),
+            equity_curve=self.equity_curve_data(sorted_trades, tz_offset_hours=tz_offset_hours),
+            risk_metrics=self.risk_metrics(sorted_trades, tz_offset_hours=tz_offset_hours),
         )
+
+    # =====================================================================
+    # HELPERS
+    # =====================================================================
+    @staticmethod
+    def _adjust_ts(ts: datetime, tz_offset_hours: int) -> datetime:
+        if tz_offset_hours == 0:
+            return ts
+        return ts + timedelta(hours=tz_offset_hours)
+
+    @staticmethod
+    def _get_session(hour: int) -> str:
+        for name, (start, end) in SESSIONS.items():
+            if start <= hour < end:
+                return name
+        return "after_hours"
 
     # =====================================================================
     # PERFORMANCE METRICS
     # =====================================================================
-    def overall_metrics(self, trades: list[Trade]) -> dict:
+    def overall_metrics(self, trades: list[Trade], tz_offset_hours: int = 0) -> dict:
         total = len(trades)
         if total == 0:
             return {}
@@ -80,7 +97,8 @@ class TradeAnalytics:
 
         daily_pnl = defaultdict(float)
         for t in trades:
-            daily_pnl[t.timestamp.date().isoformat()] += t.pnl
+            adj = self._adjust_ts(t.timestamp, tz_offset_hours)
+            daily_pnl[adj.date().isoformat()] += t.pnl
 
         best_day = max(daily_pnl.items(), key=lambda x: x[1]) if daily_pnl else (None, 0)
         worst_day = min(daily_pnl.items(), key=lambda x: x[1]) if daily_pnl else (None, 0)
@@ -97,7 +115,7 @@ class TradeAnalytics:
             "average_loser": round(avg_loser, 2),
             "largest_winner": round(max(t.pnl for t in winners), 2) if winners else 0,
             "largest_loser": round(min(t.pnl for t in losers), 2) if losers else 0,
-            "profit_factor": round(gross_profit / gross_loss, 2) if gross_loss > 0 else float("inf"),
+            "profit_factor": round(gross_profit / gross_loss, 2) if gross_loss > 0 else None,
             "expectancy": round(avg_winner * win_rate - avg_loser * loss_rate, 2),
             "total_pnl": round(sum(t.pnl for t in trades), 2),
             "total_fees": round(total_fees, 2),
@@ -110,7 +128,7 @@ class TradeAnalytics:
     # =====================================================================
     # TIME ANALYSIS
     # =====================================================================
-    def time_analysis(self, trades: list[Trade]) -> dict:
+    def time_analysis(self, trades: list[Trade], tz_offset_hours: int = 0) -> dict:
         if not trades:
             return {}
 
@@ -127,13 +145,14 @@ class TradeAnalytics:
         session_pnl = defaultdict(float)
 
         for t in trades:
-            h = t.timestamp.hour
+            adj = self._adjust_ts(t.timestamp, tz_offset_hours)
+            h = adj.hour
             hour_total[h] += 1
             hour_pnl[h] += t.pnl
             if t.pnl > 0:
                 hour_wins[h] += 1
 
-            dow = DAY_NAMES[t.timestamp.weekday()]
+            dow = DAY_NAMES[adj.weekday()]
             dow_total[dow] += 1
             dow_pnl[dow] += t.pnl
             if t.pnl > 0:
@@ -281,23 +300,23 @@ class TradeAnalytics:
             "max_loss_streak": max((s["count"] for s in loss_streaks), default=0),
             "avg_win_streak": round(statistics.mean(s["count"] for s in win_streaks), 1) if win_streaks else 0,
             "avg_loss_streak": round(statistics.mean(s["count"] for s in loss_streaks), 1) if loss_streaks else 0,
-            "streaks_history": streaks[-20:],  # last 20 streaks
+            "streaks_history": streaks[-20:],
         }
 
     # =====================================================================
     # EQUITY CURVE
     # =====================================================================
-    def equity_curve_data(self, trades: list[Trade]) -> dict:
+    def equity_curve_data(self, trades: list[Trade], tz_offset_hours: int = 0) -> dict:
         if not trades:
             return {}
 
-        cumulative = []
         running = 0.0
         daily_agg: dict[str, dict] = {}
 
         for t in trades:
             running += t.pnl
-            date_str = t.timestamp.date().isoformat()
+            adj = self._adjust_ts(t.timestamp, tz_offset_hours)
+            date_str = adj.date().isoformat()
             if date_str not in daily_agg:
                 daily_agg[date_str] = {"cumulative_pnl": 0.0, "trade_count": 0}
             daily_agg[date_str]["cumulative_pnl"] = round(running, 2)
@@ -310,6 +329,7 @@ class TradeAnalytics:
 
         # Drawdown
         peak = 0.0
+        min_during_dd = 0.0
         drawdown_periods = []
         current_dd_start = None
 
@@ -331,12 +351,10 @@ class TradeAnalytics:
                 else:
                     min_during_dd = min(min_during_dd, pnl)
 
-        max_dd_amount = 0.0
         max_dd = {"amount": 0, "start": None, "end": None}
         if drawdown_periods:
             worst = max(drawdown_periods, key=lambda d: d["depth"])
             max_dd = worst
-            max_dd_amount = worst["depth"]
 
         # Rolling 20-trade metrics
         rolling_wr_20 = []
@@ -359,13 +377,14 @@ class TradeAnalytics:
     # =====================================================================
     # RISK METRICS
     # =====================================================================
-    def risk_metrics(self, trades: list[Trade]) -> dict:
+    def risk_metrics(self, trades: list[Trade], tz_offset_hours: int = 0) -> dict:
         if not trades:
             return {}
 
         daily_pnl: dict[str, float] = defaultdict(float)
         for t in trades:
-            daily_pnl[t.timestamp.date().isoformat()] += t.pnl
+            adj = self._adjust_ts(t.timestamp, tz_offset_hours)
+            daily_pnl[adj.date().isoformat()] += t.pnl
 
         daily_returns = list(daily_pnl.values())
         winners = [t for t in trades if t.pnl > 0]
@@ -373,9 +392,8 @@ class TradeAnalytics:
 
         avg_winner = statistics.mean(t.pnl for t in winners) if winners else 0
         avg_loser = abs(statistics.mean(t.pnl for t in losers)) if losers else 0
-        avg_rr = round(avg_winner / avg_loser, 2) if avg_loser > 0 else float("inf")
+        avg_rr = round(avg_winner / avg_loser, 2) if avg_loser > 0 else None
 
-        # Max consecutive losses
         max_consec_loss = 0
         current_consec = 0
         for t in trades:
@@ -397,40 +415,36 @@ class TradeAnalytics:
         }
 
         if len(daily_returns) >= 30:
-            # Sharpe (annualized, ~252 trading days)
             if std_daily > 0:
                 result["sharpe_ratio"] = round((avg_daily / std_daily) * math.sqrt(252), 2)
             else:
                 result["sharpe_ratio"] = None
 
-            # Sortino — only downside deviation
-            downside = [r for r in daily_returns if r < 0]
-            if downside:
-                downside_std = statistics.stdev(downside)
-                result["sortino_ratio"] = round((avg_daily / downside_std) * math.sqrt(252), 2) if downside_std > 0 else None
+            # Sortino — downside deviation of ALL returns (0 for non-negative)
+            downside_returns = [min(0, r) for r in daily_returns]
+            downside_dev = (sum(r ** 2 for r in downside_returns) / len(downside_returns)) ** 0.5
+            if downside_dev > 0:
+                result["sortino_ratio"] = round((avg_daily / downside_dev) * math.sqrt(252), 2)
             else:
                 result["sortino_ratio"] = None
 
-            # VaR 95% — parametric
             if std_daily > 0:
                 result["var_95"] = round(avg_daily - 1.645 * std_daily, 2)
             else:
                 result["var_95"] = None
 
-            # Calmar ratio
-            cumulative = []
+            # Calmar — trade-by-trade running equity for accurate max drawdown
             running = 0.0
-            peak = 0.0
-            max_dd = 0.0
-            for r in daily_returns:
-                running += r
-                peak = max(peak, running)
-                dd = peak - running
-                max_dd = max(max_dd, dd)
+            eq_peak = 0.0
+            max_dd_val = 0.0
+            for t in trades:
+                running += t.pnl
+                eq_peak = max(eq_peak, running)
+                max_dd_val = max(max_dd_val, eq_peak - running)
             total_return = sum(daily_returns)
             years = len(daily_returns) / 252
             annual_return = total_return / years if years > 0 else 0
-            result["calmar_ratio"] = round(annual_return / max_dd, 2) if max_dd > 0 else None
+            result["calmar_ratio"] = round(annual_return / max_dd_val, 2) if max_dd_val > 0 else None
         else:
             result["sharpe_ratio"] = None
             result["sortino_ratio"] = None
@@ -445,13 +459,3 @@ class TradeAnalytics:
     def behavioral_analysis(self, trades: list[Trade]) -> dict:
         from app.engine.behavioral import BehavioralAnalyzer
         return BehavioralAnalyzer().analyze(trades)
-
-    # =====================================================================
-    # HELPERS
-    # =====================================================================
-    @staticmethod
-    def _get_session(hour: int) -> str:
-        for name, (start, end) in SESSIONS.items():
-            if start <= hour < end:
-                return name
-        return "after_hours"

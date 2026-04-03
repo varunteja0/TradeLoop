@@ -17,20 +17,20 @@ from app.models.trade import Trade
 
 class BehavioralAnalyzer:
 
-    def analyze(self, trades: list[Trade]) -> dict:
+    def analyze(self, trades: list[Trade], tz_offset_hours: float = 0) -> dict:
         if len(trades) < 5:
             return {"insufficient_data": True, "min_trades_needed": 5}
 
         return {
             "revenge_trades": self._revenge_trades(trades),
-            "overtrading_days": self._overtrading_days(trades),
+            "overtrading_days": self._overtrading_days(trades, tz_offset_hours),
             "tilt_detection": self._tilt_detection(trades),
             "win_streak_behavior": self._streak_behavior(trades, streak_type="win"),
             "loss_streak_behavior": self._streak_behavior(trades, streak_type="loss"),
-            "monday_effect": self._day_effect(trades, target_day=0, label="Monday"),
-            "friday_effect": self._day_effect(trades, target_day=4, label="Friday"),
-            "first_trade_of_day": self._position_in_day(trades, position="first"),
-            "last_trade_of_day": self._position_in_day(trades, position="last"),
+            "monday_effect": self._day_effect(trades, target_day=0, label="Monday", tz_offset_hours=tz_offset_hours),
+            "friday_effect": self._day_effect(trades, target_day=4, label="Friday", tz_offset_hours=tz_offset_hours),
+            "first_trade_of_day": self._position_in_day(trades, position="first", tz_offset_hours=tz_offset_hours),
+            "last_trade_of_day": self._position_in_day(trades, position="last", tz_offset_hours=tz_offset_hours),
             "sizing_after_loss": self._sizing_after_outcome(trades),
             "time_between_trades": self._time_between_trades(trades),
         }
@@ -38,13 +38,15 @@ class BehavioralAnalyzer:
     def _revenge_trades(self, trades: list[Trade]) -> dict:
         """Trades taken within 5 minutes of a losing trade."""
         revenge = []
+        revenge_indices: set[int] = set()
         for i in range(1, len(trades)):
             prev = trades[i - 1]
             curr = trades[i]
             if prev.pnl < 0:
                 gap = (curr.timestamp - prev.timestamp).total_seconds()
-                if 0 < gap <= 300:  # 5 minutes
+                if 0 < gap <= 300:
                     revenge.append(curr)
+                    revenge_indices.add(i)
 
         if not revenge:
             return {"count": 0, "win_rate": None, "avg_pnl": None, "total_pnl": None,
@@ -53,7 +55,7 @@ class BehavioralAnalyzer:
         wins = sum(1 for t in revenge if t.pnl > 0)
         total_pnl = sum(t.pnl for t in revenge)
 
-        non_revenge_trades = [t for t in trades if t not in revenge]
+        non_revenge_trades = [t for i, t in enumerate(trades) if i not in revenge_indices]
         non_revenge_wr = (
             sum(1 for t in non_revenge_trades if t.pnl > 0) / len(non_revenge_trades) * 100
             if non_revenge_trades else 0
@@ -74,11 +76,13 @@ class BehavioralAnalyzer:
             ) if len(revenge) >= 3 else None,
         }
 
-    def _overtrading_days(self, trades: list[Trade]) -> dict:
+    def _overtrading_days(self, trades: list[Trade], tz_offset_hours: float = 0) -> dict:
         """Days with more than 2x the average daily trade count."""
+        offset = timedelta(hours=tz_offset_hours)
         daily_counts: dict[str, list[Trade]] = defaultdict(list)
         for t in trades:
-            daily_counts[t.timestamp.date().isoformat()].append(t)
+            day_key = (t.timestamp + offset).date().isoformat()
+            daily_counts[day_key].append(t)
 
         if not daily_counts:
             return {"days": [], "avg_daily_trades": 0}
@@ -105,7 +109,7 @@ class BehavioralAnalyzer:
             "days": sorted(overtrading, key=lambda x: x["pnl"])[:10],
             "total_pnl_on_overtrading_days": round(total_pnl_overtrading, 2),
             "alert": (
-                f"You overtaded on {len(overtrading)} days (>{round(threshold, 0):.0f} trades/day). "
+                f"You overtraded on {len(overtrading)} days (>{round(threshold, 0):.0f} trades/day). "
                 f"Total P&L on those days: ${round(total_pnl_overtrading, 2)}."
             ) if overtrading else None,
         }
@@ -124,7 +128,7 @@ class BehavioralAnalyzer:
             if consec_losses >= 2:
                 prev_qty = trades[i - 1].quantity
                 curr_qty = trades[i].quantity
-                if curr_qty > prev_qty * 1.2:  # 20% size increase
+                if curr_qty > prev_qty * 1.2:
                     tilt_events.append({
                         "trade_index": i,
                         "timestamp": trades[i].timestamp.isoformat(),
@@ -147,24 +151,7 @@ class BehavioralAnalyzer:
 
     def _streak_behavior(self, trades: list[Trade], streak_type: str, min_streak: int = 3) -> dict:
         """What happens after N+ consecutive wins or losses?"""
-        next_trades_after_streak = []
-        streak_count = 0
-        is_target = streak_type == "win"
-
-        for i in range(len(trades)):
-            if (trades[i].pnl > 0) == is_target:
-                streak_count += 1
-            else:
-                if streak_count >= min_streak and i < len(trades):
-                    next_trades_after_streak.append(trades[i])
-                streak_count = 0 if is_target else 1
-                if not is_target and trades[i].pnl < 0:
-                    streak_count = 1
-                elif is_target:
-                    streak_count = 0
-
-        # Re-do with cleaner logic
-        next_trades_after_streak = []
+        next_trades_after_streak: list[Trade] = []
         consec = 0
         target_positive = streak_type == "win"
 
@@ -195,10 +182,17 @@ class BehavioralAnalyzer:
             ),
         }
 
-    def _day_effect(self, trades: list[Trade], target_day: int, label: str) -> dict:
+    def _day_effect(
+        self,
+        trades: list[Trade],
+        target_day: int,
+        label: str,
+        tz_offset_hours: float = 0,
+    ) -> dict:
         """Is a specific day significantly different from other days?"""
-        target = [t for t in trades if t.timestamp.weekday() == target_day]
-        others = [t for t in trades if t.timestamp.weekday() != target_day]
+        offset = timedelta(hours=tz_offset_hours)
+        target = [t for t in trades if (t.timestamp + offset).weekday() == target_day]
+        others = [t for t in trades if (t.timestamp + offset).weekday() != target_day]
 
         if not target or not others:
             return {"has_data": False}
@@ -206,10 +200,9 @@ class BehavioralAnalyzer:
         target_wr = sum(1 for t in target if t.pnl > 0) / len(target) * 100
         other_wr = sum(1 for t in others if t.pnl > 0) / len(others) * 100
         target_pnl = sum(t.pnl for t in target)
-        other_avg_pnl = sum(t.pnl for t in others) / (len(set(t.timestamp.weekday() for t in others)) or 1)
 
         diff = target_wr - other_wr
-        significant = abs(diff) > 10  # 10 percentage point difference
+        significant = abs(diff) > 10 and len(target) >= 5
 
         return {
             "has_data": True,
@@ -227,20 +220,29 @@ class BehavioralAnalyzer:
             ) if significant else None,
         }
 
-    def _position_in_day(self, trades: list[Trade], position: str) -> dict:
+    def _position_in_day(
+        self,
+        trades: list[Trade],
+        position: str,
+        tz_offset_hours: float = 0,
+    ) -> dict:
         """Win rate of first or last trade of the day vs the rest."""
+        offset = timedelta(hours=tz_offset_hours)
         daily: dict[str, list[Trade]] = defaultdict(list)
         for t in trades:
-            daily[t.timestamp.date().isoformat()].append(t)
+            day_key = (t.timestamp + offset).date().isoformat()
+            daily[day_key].append(t)
 
-        target_trades = []
-        rest_trades = []
+        target_trades: list[Trade] = []
+        rest_trades: list[Trade] = []
+        multi_trade_days = 0
 
         for date, day_trades in daily.items():
             sorted_day = sorted(day_trades, key=lambda t: t.timestamp)
             if len(sorted_day) < 2:
                 continue
 
+            multi_trade_days += 1
             if position == "first":
                 target_trades.append(sorted_day[0])
                 rest_trades.extend(sorted_day[1:])
@@ -248,7 +250,7 @@ class BehavioralAnalyzer:
                 target_trades.append(sorted_day[-1])
                 rest_trades.extend(sorted_day[:-1])
 
-        if not target_trades:
+        if not target_trades or multi_trade_days < 5:
             return {"has_data": False}
 
         target_wr = sum(1 for t in target_trades if t.pnl > 0) / len(target_trades) * 100

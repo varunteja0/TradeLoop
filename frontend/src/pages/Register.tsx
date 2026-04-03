@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../store/auth";
+import Logo from "../components/Logo";
 
 export default function Register() {
   const [name, setName] = useState("");
@@ -10,6 +11,10 @@ export default function Register() {
   const register = useAuth((s) => s.register);
   const loading = useAuth((s) => s.loading);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    document.title = "Sign Up — TradeLoop";
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,58 +26,67 @@ export default function Register() {
     try {
       await register(email, password, name || undefined);
       navigate("/upload");
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Registration failed");
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        "Registration failed";
+      setError(msg);
     }
   };
 
   return (
     <div className="min-h-screen bg-bg-primary flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <Link to="/" className="flex items-center gap-2 justify-center mb-8">
-          <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0a0a0f" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-            </svg>
-          </div>
-          <span className="text-xl font-bold text-white">TradeLoop</span>
-        </Link>
+      <main className="w-full max-w-md">
+        <div className="flex justify-center mb-8">
+          <Logo linkTo="/" />
+        </div>
 
         <div className="card">
           <h1 className="text-2xl font-bold text-white mb-2 text-center">Create your account</h1>
           <p className="text-gray-500 text-sm text-center mb-6">50 trades/month analyzed free</p>
 
           {error && (
-            <div className="bg-loss/10 border border-loss/30 text-loss text-sm rounded-lg p-3 mb-4">
+            <div role="alert" className="bg-loss/10 border border-loss/30 text-loss text-sm rounded-lg p-3 mb-4">
               {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Name</label>
+              <label htmlFor="register-name" className="block text-sm text-gray-400 mb-1.5">
+                Name
+              </label>
               <input
+                id="register-name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="input-field"
                 placeholder="Your name"
+                autoComplete="name"
               />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Email</label>
+              <label htmlFor="register-email" className="block text-sm text-gray-400 mb-1.5">
+                Email
+              </label>
               <input
+                id="register-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="input-field"
                 placeholder="you@example.com"
                 required
+                autoComplete="email"
               />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Password</label>
+              <label htmlFor="register-password" className="block text-sm text-gray-400 mb-1.5">
+                Password
+              </label>
               <input
+                id="register-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -80,7 +94,11 @@ export default function Register() {
                 placeholder="Min 6 characters"
                 required
                 minLength={6}
+                autoComplete="new-password"
               />
+              <p className="text-xs text-gray-500 mt-1.5">
+                Must be at least 6 characters. Use a mix of letters, numbers, and symbols for best security.
+              </p>
             </div>
             <button type="submit" className="btn-primary w-full" disabled={loading}>
               {loading ? "Creating account..." : "Create Account"}
@@ -94,7 +112,7 @@ export default function Register() {
             </Link>
           </p>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
