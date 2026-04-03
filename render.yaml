@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: tradeloop-api
+    runtime: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tradeloop-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      - key: FRONTEND_URL
+        value: https://tradeloop-web.onrender.com
+    healthCheckPath: /api/health
+
+databases:
+  - name: tradeloop-db
+    plan: free
+    region: oregon
+    databaseName: tradeloop
+    user: tradeloop

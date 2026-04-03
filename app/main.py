@@ -53,12 +53,9 @@ OPENAPI_TAGS = [
 async def lifespan(app: FastAPI):
     logger.info("TradeLoop v%s starting up (env=%s)", APP_VERSION, settings.environment)
 
-    if settings.environment != "production":
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        logger.info("Database tables created (dev mode)")
-    else:
-        logger.info("Production mode — use Alembic for migrations")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    logger.info("Database tables ready")
 
     yield
     logger.info("TradeLoop shutting down")
