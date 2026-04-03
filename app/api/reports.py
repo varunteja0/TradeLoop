@@ -1,33 +1,31 @@
+"""Reports API — thin route, logic in AnalyticsService."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
 from app.dependencies import get_current_user
-from app.models.trade import Trade
 from app.models.user import User
-from app.engine.weekly_report import WeeklyReportEngine
+from app.services.analytics_service import AnalyticsService
+from app.services.trade_service import TradeService
 
 router = APIRouter(prefix="/reports", tags=["reports"])
-report_engine = WeeklyReportEngine()
+analytics_service = AnalyticsService()
+trade_service = TradeService()
 
 
 @router.get("/weekly")
 async def weekly_report(
     tz: int = Query(None),
-    week_of: Optional[str] = Query(None, description="ISO date YYYY-MM-DD for the end of the week to report on"),
+    week_of: Optional[str] = Query(None, description="ISO date YYYY-MM-DD"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    result = await db.execute(
-        select(Trade).where(Trade.user_id == user.id).order_by(Trade.timestamp)
-    )
-    trades = list(result.scalars().all())
+    trades = await trade_service.get_user_trades(db, user)
     tz_offset = tz if tz is not None else user.timezone_offset
 
     week_end = None
@@ -37,4 +35,4 @@ async def weekly_report(
         except ValueError:
             pass
 
-    return report_engine.generate(trades, tz_offset_hours=tz_offset, week_end_date=week_end)
+    return await analytics_service.get_weekly_report(trades, tz_offset, week_end)

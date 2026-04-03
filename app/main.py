@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import logging
 import sys
+import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -15,32 +16,35 @@ from app.config import get_settings
 from app.db import engine, Base
 from app.api import auth, trades, analytics, payments, insights, prop_accounts, broker_connect, reports
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)-8s [%(name)s] %(message)s",
-    stream=sys.stdout,
-)
+from app.logging_config import setup_logging
+setup_logging()
 logger = logging.getLogger("tradeloop")
 
 settings = get_settings()
+API_VERSION = "1"
+APP_VERSION = "4.0.0"
 
 limiter = Limiter(key_func=get_remote_address)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("TradeLoop starting up (env=%s)", settings.environment)
+    logger.info("TradeLoop v%s starting up (env=%s)", APP_VERSION, settings.environment)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Database tables ready")
+
+    from app.services.background import register_background_handlers
+    register_background_handlers()
+
     yield
     logger.info("TradeLoop shutting down")
 
 
 app = FastAPI(
     title="TradeLoop",
-    description="Trade journal analytics engine for day traders and prop firm traders",
-    version="3.0.0",
+    description="Trading behavior engine — the exact dollar cost of every mistake",
+    version=APP_VERSION,
     lifespan=lifespan,
 )
 
@@ -60,25 +64,64 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def add_request_metadata(request: Request, call_next):
+    request_id = str(uuid.uuid4())[:8]
+    request.state.request_id = request_id
+    response: Response = await call_next(request)
+    response.headers["X-Request-Id"] = request_id
+    response.headers["X-API-Version"] = API_VERSION
+    return response
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    request_id = getattr(request.state, "request_id", "unknown")
+    logger.exception("Unhandled error [%s] %s %s", request_id, request.method, request.url.path)
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error"},
+        content={
+            "error": "internal_server_error",
+            "detail": "Internal server error",
+            "request_id": request_id,
+        },
     )
 
 
-app.include_router(auth.router, prefix="/api")
-app.include_router(trades.router, prefix="/api")
-app.include_router(analytics.router, prefix="/api")
-app.include_router(payments.router, prefix="/api")
-app.include_router(insights.router, prefix="/api")
-app.include_router(prop_accounts.router, prefix="/api")
-app.include_router(broker_connect.router, prefix="/api")
-app.include_router(reports.router, prefix="/api")
+# v1 API — all routes under /api/v1/
+# Also mount at /api/ for backward compatibility during migration
+V1_PREFIX = "/api/v1"
+COMPAT_PREFIX = "/api"
+
+for prefix in (V1_PREFIX, COMPAT_PREFIX):
+    app.include_router(auth.router, prefix=prefix)
+    app.include_router(trades.router, prefix=prefix)
+    app.include_router(analytics.router, prefix=prefix)
+    app.include_router(payments.router, prefix=prefix)
+    app.include_router(insights.router, prefix=prefix)
+    app.include_router(prop_accounts.router, prefix=prefix)
+    app.include_router(broker_connect.router, prefix=prefix)
+    app.include_router(reports.router, prefix=prefix)
 
 
 @app.get("/api/health")
-async def health():
-    return {"status": "ok", "service": "tradeloop", "version": "3.0.0"}
+@app.get("/api/v1/health")
+async def health(request: Request):
+    from sqlalchemy import text as sa_text
+    db_ok = False
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(sa_text("SELECT 1"))
+        db_ok = True
+    except Exception:
+        pass
+
+    status = "ok" if db_ok else "degraded"
+    return {
+        "status": status,
+        "service": "tradeloop",
+        "version": APP_VERSION,
+        "api_version": API_VERSION,
+        "database": "connected" if db_ok else "error",
+        "request_id": getattr(request.state, "request_id", None),
+    }
