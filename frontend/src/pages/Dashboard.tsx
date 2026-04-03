@@ -12,6 +12,7 @@ import BehaviorAlerts from "../components/BehaviorAlerts";
 import SymbolTable from "../components/SymbolTable";
 import StreakDisplay from "../components/StreakDisplay";
 import TradeTable from "../components/TradeTable";
+import TradeChart from "../components/TradeChart";
 
 type TabKey = "overview" | "behavior" | "time" | "symbols" | "trades";
 
@@ -96,6 +97,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [dateRange, setDateRange] = useState<DateRange>("all");
+  const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
+  const [chartTrades, setChartTrades] = useState<Array<{timestamp:string;symbol:string;side:string;entry_price:number;exit_price:number;pnl:number;duration_minutes:number|null}>>([]);
   const user = useAuth((s) => s.user);
   const logout = useAuth((s) => s.logout);
   const { toast } = useToast();
@@ -116,6 +119,13 @@ export default function Dashboard() {
       })
       .finally(() => setLoading(false));
   }, [toast]);
+
+  useEffect(() => {
+    if (!selectedSymbol) { setChartTrades([]); return; }
+    api.get(`/trades?per_page=200&symbol=${selectedSymbol}`)
+      .then(({ data }) => setChartTrades(data.trades))
+      .catch(() => setChartTrades([]));
+  }, [selectedSymbol]);
 
   const filteredEquityCurve = useMemo(() => {
     if (!analytics?.equity_curve?.cumulative_pnl || dateRange === "all") {
@@ -346,7 +356,12 @@ export default function Dashboard() {
               )}
 
               {activeTab === "symbols" && analytics?.symbols?.per_symbol && (
-                <SymbolTable perSymbol={analytics.symbols.per_symbol} />
+                <div className="space-y-4">
+                  <SymbolTable perSymbol={analytics.symbols.per_symbol} onSymbolClick={(sym) => setSelectedSymbol(sym === selectedSymbol ? null : sym)} selectedSymbol={selectedSymbol} />
+                  {selectedSymbol && chartTrades.length > 0 && (
+                    <TradeChart trades={chartTrades} symbol={selectedSymbol} />
+                  )}
+                </div>
               )}
 
               {activeTab === "trades" && <TradeTable />}

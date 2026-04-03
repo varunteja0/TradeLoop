@@ -19,18 +19,27 @@ class WeeklyReportEngine:
         self.analytics = TradeAnalytics()
         self.insights_engine = CounterfactualEngine()
 
-    def generate(self, all_trades: list, tz_offset_hours: int = 0) -> dict:
+    def generate(self, all_trades: list, tz_offset_hours: int = 0,
+                 week_end_date: Optional[datetime] = None) -> dict:
         if not all_trades:
             return {"has_data": False}
 
         sorted_trades = sorted(all_trades, key=lambda t: t.timestamp)
-        now = datetime.now(timezone.utc) + timedelta(hours=tz_offset_hours)
+        now = week_end_date or (datetime.now(timezone.utc) + timedelta(hours=tz_offset_hours))
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
 
-        week_start = now - timedelta(days=7)
-        prev_week_start = now - timedelta(days=14)
+        # Strip timezone for comparison since SQLite timestamps are naive
+        now_naive = now.replace(tzinfo=None)
+        week_start = now_naive - timedelta(days=7)
+        prev_week_start = now_naive - timedelta(days=14)
 
-        this_week = [t for t in sorted_trades if t.timestamp >= week_start]
-        prev_week = [t for t in sorted_trades if prev_week_start <= t.timestamp < week_start]
+        def ts_naive(t: object) -> datetime:
+            ts = t.timestamp  # type: ignore
+            return ts.replace(tzinfo=None) if ts.tzinfo else ts
+
+        this_week = [t for t in sorted_trades if ts_naive(t) >= week_start]
+        prev_week = [t for t in sorted_trades if prev_week_start <= ts_naive(t) < week_start]
 
         if not this_week:
             return {"has_data": False, "message": "No trades this week"}

@@ -521,6 +521,15 @@ class CounterfactualEngine:
         return [{"date": d, "pnl": p} for d, p in daily.items()]
 
     def _insight_to_dict(self, insight: Insight) -> dict:
+        # Merge actual and counterfactual into a single array for frontend charting
+        actual = {p["date"]: p["pnl"] for p in insight.actual_equity}
+        counter = {p["date"]: p["pnl"] for p in insight.counterfactual_equity}
+        all_dates = sorted(set(list(actual.keys()) + list(counter.keys())))
+        equity_curve = [
+            {"date": d, "actual": actual.get(d, 0), "counterfactual": counter.get(d, 0)}
+            for d in all_dates
+        ][-30:]
+
         return {
             "id": insight.id,
             "title": insight.title,
@@ -531,8 +540,7 @@ class CounterfactualEngine:
             "description": insight.description,
             "recommendation": insight.recommendation,
             "confidence": round(insight.confidence, 2),
-            "actual_equity": insight.actual_equity[-30:],
-            "counterfactual_equity": insight.counterfactual_equity[-30:],
+            "equity_curve": equity_curve,
             "affected_trade_count": insight.affected_trade_count,
             "stats": insight.stats,
         }

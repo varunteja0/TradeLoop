@@ -3,6 +3,8 @@ import type { SymbolData } from "../types";
 
 interface Props {
   perSymbol: Record<string, SymbolData>;
+  onSymbolClick?: (symbol: string) => void;
+  selectedSymbol?: string | null;
 }
 
 type SortKey = "trades" | "win_rate" | "total_pnl" | "avg_pnl";
@@ -18,7 +20,7 @@ const columns: { key: SortKey; label: string; className: string }[] = [
 const pnlIndicator = (v: number) => (v >= 0 ? "▲" : "▼");
 const pnlPrefix = (v: number) => (v >= 0 ? "+" : "");
 
-const SymbolTable = React.memo(function SymbolTable({ perSymbol }: Props) {
+const SymbolTable = React.memo(function SymbolTable({ perSymbol, onSymbolClick, selectedSymbol }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("total_pnl");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -82,7 +84,8 @@ const SymbolTable = React.memo(function SymbolTable({ perSymbol }: Props) {
           {sorted.map(([symbol, data]) => (
             <tr
               key={symbol}
-              className="border-b border-border/50 hover:bg-bg-hover transition-colors"
+              className={`border-b border-border/50 hover:bg-bg-hover transition-colors ${onSymbolClick ? "cursor-pointer" : ""} ${selectedSymbol === symbol ? "bg-accent/5 border-accent/20" : ""}`}
+              onClick={() => onSymbolClick?.(symbol)}
             >
               <td className="py-3 pr-4 font-mono font-medium text-white">
                 {symbol}

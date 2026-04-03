@@ -21,20 +21,27 @@ interface EquityPoint {
 
 interface Insight {
   id: string;
-  type: string;
+  category: string;
   severity: "critical" | "major" | "minor" | "positive";
   title: string;
   description: string;
   dollar_impact: number;
   monthly_projection: number;
   recommendation: string;
-  affected_trades: number;
+  affected_trade_count: number;
   equity_curve?: EquityPoint[];
+  confidence: number;
+  stats: Record<string, unknown>;
 }
 
 interface InsightsResponse {
-  actual_total_pnl: number;
-  potential_total_pnl: number;
+  summary: {
+    actual_total_pnl: number;
+    potential_total_pnl: number;
+    total_leaks_found: number;
+    total_money_leaked: number;
+    projected_monthly_savings: number;
+  };
   insights: Insight[];
 }
 
@@ -153,7 +160,7 @@ function InsightCard({
           </div>
 
           <p className="text-xs text-gray-500">
-            {insight.affected_trades} trade{insight.affected_trades !== 1 ? "s" : ""} affected
+            {insight.affected_trade_count} trade{insight.affected_trade_count !== 1 ? "s" : ""} affected
           </p>
 
           {insight.equity_curve && insight.equity_curve.length > 0 && (
@@ -268,7 +275,7 @@ export default function Insights() {
   const costInsights = sortedInsights.filter((i) => i.dollar_impact <= 0);
   const edgeInsights = sortedInsights.filter((i) => i.dollar_impact > 0);
 
-  const gap = (data?.potential_total_pnl ?? 0) - (data?.actual_total_pnl ?? 0);
+  const gap = (data?.summary?.potential_total_pnl ?? 0) - (data?.summary?.actual_total_pnl ?? 0);
 
   return (
     <div className="min-h-screen bg-bg-primary">
@@ -325,14 +332,14 @@ export default function Insights() {
               <div className="flex flex-wrap gap-6 text-sm">
                 <div>
                   <p className="text-gray-500 text-xs">Actual P&amp;L</p>
-                  <p className={`font-mono font-bold ${data.actual_total_pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                    {formatDollar(data.actual_total_pnl)}
+                  <p className={`font-mono font-bold ${(data.summary?.actual_total_pnl ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                    {formatDollar(data.summary?.actual_total_pnl ?? 0)}
                   </p>
                 </div>
                 <div>
                   <p className="text-gray-500 text-xs">Potential P&amp;L</p>
                   <p className="text-accent font-mono font-bold">
-                    {formatDollar(data.potential_total_pnl)}
+                    {formatDollar(data.summary?.potential_total_pnl ?? 0)}
                   </p>
                 </div>
               </div>

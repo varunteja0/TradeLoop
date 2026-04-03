@@ -3,379 +3,300 @@ import { Link } from "react-router-dom";
 import api from "../api/client";
 import Logo from "../components/Logo";
 import { useAuth } from "../store/auth";
+import { useToast } from "../components/Toast";
 
-interface WeekComparison {
-  pnl: number;
-  pnl_change: number;
+interface WeekMetrics {
+  total_trades: number;
+  winners: number;
+  losers: number;
   win_rate: number;
-  win_rate_change: number;
-  trade_count: number;
-  trade_count_change: number;
+  total_pnl: number;
+  avg_pnl: number;
+  largest_winner: number;
+  largest_loser: number;
   revenge_trades: number;
-  revenge_trade_change: number;
+  trading_days: number;
+  avg_trades_per_day: number;
 }
 
-interface TopInsight {
+interface Comparison {
+  pnl_change: number;
+  win_rate_change: number;
+  trade_count_change: number;
+  revenge_change: number;
+  improved: boolean;
+}
+
+interface FocusArea {
+  area: string;
+  why: string;
+  action: string;
+  potential_savings: number | null;
+}
+
+interface InsightSummary {
+  id: string;
   title: string;
   dollar_impact: number;
   recommendation: string;
-}
-
-interface GradeBreakdown {
-  category: string;
-  score: string;
-  comment: string;
+  severity: string;
 }
 
 interface WeeklyReportData {
-  week_start: string;
-  week_end: string;
-  grade: string;
-  grade_reasoning: GradeBreakdown[];
-  this_week: WeekComparison;
-  last_week: WeekComparison | null;
-  metrics: {
-    trades: number;
-    win_rate: number;
-    pnl: number;
-    avg_pnl: number;
-  };
-  top_insights: TopInsight[];
-  focus_next_week: string;
-  summary: string;
+  has_data: boolean;
+  message?: string;
+  period?: { start: string; end: string };
+  this_week?: WeekMetrics;
+  previous_week?: WeekMetrics | null;
+  comparison?: Comparison | null;
+  grade?: string;
+  grade_reasons?: string[];
+  top_insights?: InsightSummary[];
+  focus_for_next_week?: FocusArea;
+  summary?: string;
 }
 
-const GRADE_STYLES: Record<string, { color: string; bg: string }> = {
-  A: { color: "text-emerald-400", bg: "bg-emerald-500/10" },
-  B: { color: "text-teal-400", bg: "bg-teal-500/10" },
-  C: { color: "text-yellow-400", bg: "bg-yellow-500/10" },
-  D: { color: "text-orange-400", bg: "bg-orange-500/10" },
-  F: { color: "text-red-400", bg: "bg-red-500/10" },
+const GRADE_COLORS: Record<string, string> = {
+  A: "text-emerald-400 border-emerald-400/30 bg-emerald-400/10",
+  B: "text-teal-400 border-teal-400/30 bg-teal-400/10",
+  C: "text-yellow-400 border-yellow-400/30 bg-yellow-400/10",
+  D: "text-orange-400 border-orange-400/30 bg-orange-400/10",
+  F: "text-red-400 border-red-400/30 bg-red-400/10",
 };
 
-function gradeStyle(grade: string) {
-  const letter = grade.charAt(0).toUpperCase();
-  return GRADE_STYLES[letter] ?? GRADE_STYLES.C;
-}
-
-function formatDollar(value: number): string {
-  const abs = Math.abs(value).toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-  if (value > 0) return `+$${abs}`;
-  if (value < 0) return `-$${abs}`;
+function formatDollar(v: number): string {
+  const abs = Math.abs(v).toFixed(2);
+  if (v > 0) return `+$${abs}`;
+  if (v < 0) return `-$${abs}`;
   return `$${abs}`;
 }
 
-function ChangeIndicator({ value, suffix = "", invert = false }: { value: number; suffix?: string; invert?: boolean }) {
-  const isGood = invert ? value < 0 : value > 0;
-  const isBad = invert ? value > 0 : value < 0;
-  const arrow = value > 0 ? "\u25B2" : value < 0 ? "\u25BC" : "";
-  const color = isGood ? "text-emerald-400" : isBad ? "text-red-400" : "text-gray-500";
-
+function ChangeIndicator({ value, suffix = "" }: { value: number; suffix?: string }) {
+  if (value === 0) return <span className="text-gray-500">—</span>;
   return (
-    <span className={`text-xs font-mono ${color}`}>
-      {arrow} {Math.abs(value).toFixed(suffix === "%" ? 1 : 2)}
-      {suffix}
+    <span className={value > 0 ? "text-win" : "text-loss"}>
+      {value > 0 ? "▲" : "▼"} {Math.abs(value).toFixed(suffix === "%" ? 1 : 2)}{suffix}
     </span>
-  );
-}
-
-function ComparisonRow({
-  label,
-  current,
-  change,
-  format = "dollar",
-  invert = false,
-}: {
-  label: string;
-  current: number;
-  change: number;
-  format?: "dollar" | "percent" | "number";
-  invert?: boolean;
-}) {
-  let display: string;
-  let changeSuffix = "";
-  if (format === "dollar") {
-    display = formatDollar(current);
-    changeSuffix = "";
-  } else if (format === "percent") {
-    display = `${current.toFixed(1)}%`;
-    changeSuffix = "%";
-  } else {
-    display = `${current}`;
-    changeSuffix = "";
-  }
-
-  return (
-    <div className="flex items-center justify-between py-3 border-b border-border last:border-0">
-      <span className="text-sm text-gray-400">{label}</span>
-      <div className="flex items-center gap-3">
-        <span className="text-sm font-mono text-white">{display}</span>
-        <ChangeIndicator value={change} suffix={changeSuffix} invert={invert} />
-      </div>
-    </div>
-  );
-}
-
-function ReportSkeleton() {
-  return (
-    <div className="animate-pulse space-y-6 max-w-2xl mx-auto">
-      <div className="flex justify-center">
-        <div className="w-24 h-24 bg-bg-card rounded-full" />
-      </div>
-      <div className="h-6 bg-bg-card rounded w-48 mx-auto" />
-      <div className="h-40 bg-bg-card rounded-xl" />
-      <div className="h-32 bg-bg-card rounded-xl" />
-      <div className="h-48 bg-bg-card rounded-xl" />
-    </div>
   );
 }
 
 export default function WeeklyReport() {
   const [report, setReport] = useState<WeeklyReportData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [shared, setShared] = useState(false);
+  const [weekOf, setWeekOf] = useState("");
   const user = useAuth((s) => s.user);
   const logout = useAuth((s) => s.logout);
+  const { toast } = useToast();
 
   useEffect(() => {
     document.title = "Weekly Report — TradeLoop";
   }, []);
 
-  useEffect(() => {
-    api
-      .get("/reports/weekly")
+  const fetchReport = (dateParam?: string) => {
+    setLoading(true);
+    const url = dateParam ? `/reports/weekly?week_of=${dateParam}` : "/reports/weekly";
+    api.get(url)
       .then(({ data }) => setReport(data))
-      .catch((err: unknown) => {
-        const msg =
-          (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
-          "Failed to load report";
-        setError(msg);
-      })
+      .catch(() => toast("Failed to load report", "error"))
       .finally(() => setLoading(false));
-  }, []);
+  };
 
-  function handleShare() {
-    const url = window.location.href;
-    navigator.clipboard.writeText(url).then(() => {
-      setShared(true);
-      setTimeout(() => setShared(false), 2000);
-    });
-  }
+  useEffect(() => { fetchReport(); }, []);
 
-  const gs = report ? gradeStyle(report.grade) : null;
+  const handleDateChange = () => {
+    if (weekOf) fetchReport(weekOf);
+  };
+
+  const handleShare = () => {
+    navigator.clipboard.writeText(window.location.href);
+    toast("Report URL copied to clipboard", "success");
+  };
+
+  const gradeStyle = GRADE_COLORS[report?.grade ?? "C"] ?? GRADE_COLORS.C;
+  const tw = report?.this_week;
+  const comp = report?.comparison;
 
   return (
     <div className="min-h-screen bg-bg-primary">
       <nav className="sticky top-0 z-50 bg-bg-primary/80 backdrop-blur-md border-b border-border print:hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14">
           <Logo linkTo="/" size="sm" />
           <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-500 hidden sm:block">{user?.email}</span>
-            <Link to="/dashboard" className="text-xs text-gray-500 hover:text-gray-300 transition-colors">
-              Dashboard
-            </Link>
-            <button onClick={logout} className="text-xs text-gray-500 hover:text-gray-300">
-              Log out
-            </button>
+            <Link to="/dashboard" className="text-xs text-gray-400 hover:text-white transition-colors">Dashboard</Link>
+            <button onClick={logout} className="text-xs text-gray-500 hover:text-gray-300">Log out</button>
           </div>
         </div>
       </nav>
 
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8" aria-label="Weekly performance report">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+        {/* Date picker for historical reports */}
+        <div className="flex items-center gap-3 mb-6 print:hidden">
+          <label htmlFor="week-of" className="text-sm text-gray-400">Report for week of:</label>
+          <input id="week-of" type="date" value={weekOf} onChange={(e) => setWeekOf(e.target.value)}
+            className="input-field !w-auto text-sm !px-3 !py-1.5" />
+          <button onClick={handleDateChange} disabled={!weekOf} className="btn-primary text-xs px-3 py-1.5 disabled:opacity-30">
+            Load
+          </button>
+        </div>
+
         {loading ? (
-          <ReportSkeleton />
-        ) : error ? (
-          <div className="text-center py-20">
-            <p className="text-red-400 mb-4">{error}</p>
-            <Link to="/dashboard" className="btn-primary">
-              Back to Dashboard
-            </Link>
+          <div className="space-y-4 animate-pulse">
+            <div className="h-32 bg-bg-card rounded-xl" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="h-24 bg-bg-card rounded-xl" />
+              <div className="h-24 bg-bg-card rounded-xl" />
+            </div>
           </div>
-        ) : !report ? (
+        ) : !report?.has_data ? (
           <div className="text-center py-20">
-            <div className="text-6xl mb-4 opacity-20">&#x1f4c5;</div>
-            <h2 className="text-2xl font-bold text-white mb-2">No trades this week</h2>
-            <p className="text-gray-400 mb-6">Upload your trades to generate a weekly report card.</p>
-            <Link to="/upload" className="btn-primary">
-              Upload Trades
-            </Link>
+            <div className="text-5xl mb-4 opacity-30">&#x1f4ca;</div>
+            <h2 className="text-2xl font-bold text-white mb-2">No Trades This Week</h2>
+            <p className="text-gray-400 mb-2">{report?.message || "Upload trades or try a different date range."}</p>
+            <p className="text-gray-500 text-sm mb-6">Tip: Use the date picker above to view historical reports.</p>
+            <Link to="/upload" className="btn-primary">Upload Trades</Link>
           </div>
         ) : (
-          <div className="space-y-6">
-            <header className="text-center">
-              <p className="text-xs text-gray-500 mb-4 uppercase tracking-wider">
-                {report.week_start} &mdash; {report.week_end}
-              </p>
-
-              <div
-                className={`inline-flex items-center justify-center w-24 h-24 rounded-full ${gs!.bg} mb-4`}
-                aria-label={`Grade: ${report.grade}`}
-              >
-                <span className={`text-5xl font-bold font-mono ${gs!.color}`}>
-                  {report.grade}
-                </span>
+          <div className="space-y-8">
+            {/* Grade */}
+            <div className="text-center">
+              {report.period && (
+                <p className="text-xs text-gray-500 mb-4">
+                  {report.period.start} — {report.period.end}
+                </p>
+              )}
+              <div className={`inline-flex items-center justify-center w-28 h-28 rounded-full border-4 ${gradeStyle}`}>
+                <span className="text-6xl font-black">{report.grade}</span>
               </div>
+              <p className="text-sm text-gray-400 mt-3">Weekly Trading Grade</p>
+            </div>
 
-              <h1 className="text-xl font-bold text-white">Weekly Report Card</h1>
-            </header>
-
-            {report.grade_reasoning.length > 0 && (
-              <section className="bg-bg-card rounded-xl border border-border p-5" aria-label="Grade breakdown">
-                <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-                  Grade Breakdown
-                </h2>
-                <div className="space-y-2">
-                  {report.grade_reasoning.map((r, i) => (
-                    <div key={i} className="flex items-start justify-between gap-3 text-sm">
-                      <div className="flex-1">
-                        <span className="text-gray-300">{r.category}</span>
-                        <span className="text-gray-500 ml-2 text-xs">{r.comment}</span>
-                      </div>
-                      <span className="text-white font-mono text-xs font-bold">{r.score}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {report.last_week && (
-              <section className="bg-bg-card rounded-xl border border-border p-5" aria-label="Week over week comparison">
-                <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-                  This Week vs Last Week
-                </h2>
-                <ComparisonRow
-                  label="P&L"
-                  current={report.this_week.pnl}
-                  change={report.this_week.pnl_change}
-                  format="dollar"
-                />
-                <ComparisonRow
-                  label="Win Rate"
-                  current={report.this_week.win_rate}
-                  change={report.this_week.win_rate_change}
-                  format="percent"
-                />
-                <ComparisonRow
-                  label="Trades"
-                  current={report.this_week.trade_count}
-                  change={report.this_week.trade_count_change}
-                  format="number"
-                />
-                <ComparisonRow
-                  label="Revenge Trades"
-                  current={report.this_week.revenge_trades}
-                  change={report.this_week.revenge_trade_change}
-                  format="number"
-                  invert
-                />
-              </section>
-            )}
-
-            <section className="bg-bg-card rounded-xl border border-border p-5" aria-label="Key metrics">
-              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
-                Key Metrics
-              </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="text-center">
-                  <p className="text-2xl font-bold font-mono text-white">{report.metrics.trades}</p>
-                  <p className="text-xs text-gray-500 mt-1">Trades</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold font-mono text-white">
-                    {report.metrics.win_rate.toFixed(1)}%
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">Win Rate</p>
-                </div>
-                <div className="text-center">
-                  <p
-                    className={`text-2xl font-bold font-mono ${
-                      report.metrics.pnl >= 0 ? "text-emerald-400" : "text-red-400"
-                    }`}
-                  >
-                    {formatDollar(report.metrics.pnl)}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">P&amp;L</p>
-                </div>
-                <div className="text-center">
-                  <p
-                    className={`text-2xl font-bold font-mono ${
-                      report.metrics.avg_pnl >= 0 ? "text-emerald-400" : "text-red-400"
-                    }`}
-                  >
-                    {formatDollar(report.metrics.avg_pnl)}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">Avg P&amp;L</p>
+            {/* Grade reasons */}
+            {report.grade_reasons && report.grade_reasons.length > 0 && (
+              <div className="card">
+                <h3 className="text-sm font-semibold text-gray-300 mb-3">Grade Breakdown</h3>
+                <div className="space-y-1.5">
+                  {report.grade_reasons.map((reason, i) => {
+                    const isPositive = reason.startsWith("+");
+                    return (
+                      <p key={i} className={`text-sm font-mono ${isPositive ? "text-win" : "text-loss"}`}>
+                        {reason}
+                      </p>
+                    );
+                  })}
                 </div>
               </div>
-            </section>
+            )}
 
-            {report.top_insights.length > 0 && (
-              <section className="bg-bg-card rounded-xl border border-border p-5" aria-label="Top insights">
-                <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
-                  Top Insights
-                </h2>
-                <div className="space-y-4">
+            {/* Key metrics */}
+            {tw && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="card text-center">
+                  <p className="text-xs text-gray-500 mb-1">Trades</p>
+                  <p className="text-2xl font-bold text-white font-mono">{tw.total_trades}</p>
+                  {comp && <ChangeIndicator value={comp.trade_count_change} />}
+                </div>
+                <div className="card text-center">
+                  <p className="text-xs text-gray-500 mb-1">Win Rate</p>
+                  <p className="text-2xl font-bold text-white font-mono">{tw.win_rate}%</p>
+                  {comp && <ChangeIndicator value={comp.win_rate_change} suffix="%" />}
+                </div>
+                <div className="card text-center">
+                  <p className="text-xs text-gray-500 mb-1">P&L</p>
+                  <p className={`text-2xl font-bold font-mono ${tw.total_pnl >= 0 ? "text-win" : "text-loss"}`}>
+                    {formatDollar(tw.total_pnl)}
+                  </p>
+                  {comp && <ChangeIndicator value={comp.pnl_change} />}
+                </div>
+                <div className="card text-center">
+                  <p className="text-xs text-gray-500 mb-1">Avg P&L</p>
+                  <p className={`text-2xl font-bold font-mono ${tw.avg_pnl >= 0 ? "text-win" : "text-loss"}`}>
+                    {formatDollar(tw.avg_pnl)}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Week-over-week comparison */}
+            {comp && report.previous_week && (
+              <div className="card">
+                <h3 className="text-sm font-semibold text-gray-300 mb-3">vs Last Week</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <p className="text-xs text-gray-500">P&L Change</p>
+                    <p className={`font-mono font-bold ${comp.pnl_change >= 0 ? "text-win" : "text-loss"}`}>
+                      {formatDollar(comp.pnl_change)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Win Rate Change</p>
+                    <ChangeIndicator value={comp.win_rate_change} suffix="%" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Trade Count</p>
+                    <ChangeIndicator value={comp.trade_count_change} />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Revenge Trades</p>
+                    <ChangeIndicator value={-comp.revenge_change} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Top insights */}
+            {report.top_insights && report.top_insights.length > 0 && (
+              <div className="card">
+                <h3 className="text-sm font-semibold text-gray-300 mb-3">Top Insights</h3>
+                <div className="space-y-3">
                   {report.top_insights.map((insight, i) => (
-                    <div key={i} className="border-b border-border pb-4 last:border-0 last:pb-0">
-                      <div className="flex items-start justify-between gap-3 mb-1">
-                        <h3 className="text-sm font-medium text-gray-300">{insight.title}</h3>
-                        <span
-                          className={`text-sm font-bold font-mono whitespace-nowrap ${
-                            insight.dollar_impact >= 0 ? "text-emerald-400" : "text-red-400"
-                          }`}
-                        >
-                          {formatDollar(insight.dollar_impact)}
-                        </span>
+                    <div key={i} className="flex items-start gap-3 py-2 border-b border-border last:border-0">
+                      <span className={`text-lg font-bold font-mono shrink-0 ${
+                        insight.dollar_impact < 0 ? "text-loss" : "text-win"}`}>
+                        {formatDollar(insight.dollar_impact)}
+                      </span>
+                      <div>
+                        <p className="text-sm text-white font-medium">{insight.title}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{insight.recommendation}</p>
                       </div>
-                      <p className="text-xs text-gray-500">{insight.recommendation}</p>
                     </div>
                   ))}
                 </div>
-              </section>
+              </div>
             )}
 
-            {report.focus_next_week && (
-              <section
-                className="bg-gradient-to-r from-accent/5 to-accent/10 rounded-xl border border-accent/20 p-5"
-                aria-label="Focus for next week"
-              >
-                <h2 className="text-xs font-semibold text-accent uppercase tracking-wider mb-2">
-                  Focus for Next Week
-                </h2>
-                <p className="text-sm text-gray-300 leading-relaxed">{report.focus_next_week}</p>
-              </section>
+            {/* Focus for next week */}
+            {report.focus_for_next_week && (
+              <div className="card border-accent/20">
+                <h3 className="text-sm font-semibold text-accent mb-2">Focus for Next Week</h3>
+                <p className="text-white font-medium mb-1">{report.focus_for_next_week.area}</p>
+                <p className="text-sm text-gray-400 mb-2">{report.focus_for_next_week.why}</p>
+                <p className="text-sm text-gray-300 bg-bg-primary rounded-lg p-3">
+                  {report.focus_for_next_week.action}
+                </p>
+                {report.focus_for_next_week.potential_savings != null && (
+                  <p className="text-xs text-accent mt-2">
+                    Potential savings: {formatDollar(report.focus_for_next_week.potential_savings)}/month
+                  </p>
+                )}
+              </div>
             )}
 
+            {/* Summary */}
             {report.summary && (
-              <section className="bg-bg-card rounded-xl border border-border p-5" aria-label="Summary">
-                <p className="text-sm text-gray-400 leading-relaxed">{report.summary}</p>
-              </section>
+              <p className="text-center text-sm text-gray-500 italic">{report.summary}</p>
             )}
 
-            <div className="flex justify-center pt-2 print:hidden">
-              <button
-                onClick={handleShare}
-                className="btn-primary text-sm px-6 py-2.5 flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
-                  />
-                </svg>
-                {shared ? "Link Copied!" : "Share Report"}
+            {/* Share */}
+            <div className="text-center print:hidden">
+              <button onClick={handleShare} className="btn-secondary text-sm">
+                Share Report
               </button>
             </div>
 
-            <footer className="text-center pt-4 pb-8">
-              <Logo size="sm" showText={false} />
-              <p className="text-[10px] text-gray-600 mt-2">Generated by TradeLoop</p>
-            </footer>
+            {/* Footer branding */}
+            <p className="text-center text-xs text-gray-600 mt-8">
+              Generated by TradeLoop &middot; tradeloop.io
+            </p>
           </div>
         )}
       </main>
