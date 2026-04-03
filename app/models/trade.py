@@ -41,6 +41,7 @@ class Trade(Base):
     setup_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     fees: Mapped[float] = mapped_column(Float, default=0.0)
+    source: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # "csv", "zerodha", "angelone"
     created_at: Mapped[datetime] = mapped_column(DateTime(), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(), default=_utcnow, onupdate=_utcnow)
 

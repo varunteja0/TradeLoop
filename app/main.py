@@ -13,7 +13,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.config import get_settings
 from app.db import engine, Base
-from app.api import auth, trades, analytics, payments
+from app.api import auth, trades, analytics, payments, insights, prop_accounts, broker_connect, reports
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="TradeLoop",
     description="Trade journal analytics engine for day traders and prop firm traders",
-    version="2.0.0",
+    version="3.0.0",
     lifespan=lifespan,
 )
 
@@ -73,8 +73,12 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(trades.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")
 app.include_router(payments.router, prefix="/api")
+app.include_router(insights.router, prefix="/api")
+app.include_router(prop_accounts.router, prefix="/api")
+app.include_router(broker_connect.router, prefix="/api")
+app.include_router(reports.router, prefix="/api")
 
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "service": "tradeloop", "version": "2.0.0"}
+    return {"status": "ok", "service": "tradeloop", "version": "3.0.0"}

@@ -137,10 +137,21 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14">
           <Logo linkTo="/" size="sm" />
 
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-500 hidden sm:block">{user?.email}</span>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link to="/insights" className="text-xs text-accent hover:text-accent/80 font-medium hidden sm:block" title="Dollar-value leak analysis">
+              Insights
+            </Link>
+            <Link to="/prop" className="text-xs text-gray-400 hover:text-white hidden sm:block">
+              Prop Firm
+            </Link>
+            <Link to="/report" className="text-xs text-gray-400 hover:text-white hidden sm:block">
+              Weekly Report
+            </Link>
+            <Link to="/connect" className="text-xs text-gray-400 hover:text-white hidden sm:block">
+              Brokers
+            </Link>
             <Link to="/upload" className="btn-primary text-xs px-3 py-1.5">
-              Upload Trades
+              Upload
             </Link>
             <Link to="/settings" className="text-xs text-gray-500 hover:text-gray-300 transition-colors hidden sm:block">
               Settings

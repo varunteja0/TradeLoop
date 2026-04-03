@@ -123,9 +123,9 @@ export default function Landing() {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 max-w-lg mx-auto mt-16">
             {[
-              ["Pure Math", "No AI guessing"],
-              ["< 2 sec", "Full analysis"],
-              ["11+", "Pattern types"],
+            ["50+", "Metrics computed"],
+            ["8", "Leak detectors with $ cost"],
+            ["5", "Prop firm presets"],
             ].map(([val, label]) => (
               <div key={label}>
                 <div className="text-2xl font-bold text-white">{val}</div>
@@ -155,8 +155,8 @@ export default function Landing() {
                   <path d="M12 6v6l4 2" />
                 </svg>
               }
-              title="Know Your Edge"
-              description="Which setups actually work? Which hours are profitable? Which symbols are bleeding you? Stop guessing, start knowing."
+              title="Know Exactly What Your Leaks Cost"
+              description="Not just 'you revenge traded 12 times.' We show you the EXACT dollar amount: 'Revenge trading cost you ₹47,230. Here's your equity curve without those trades.'"
             />
             <FeatureCard
               icon={
@@ -177,8 +177,8 @@ export default function Landing() {
                   <line x1="12" y1="17" x2="12.01" y2="17" />
                 </svg>
               }
-              title="Catch Your Leaks"
-              description="Revenge trading detection, tilt alerts, overtrading days, sizing errors after losses. The patterns that cost you money."
+              title="Prop Firm Compliance"
+              description="Real-time drawdown tracking for FTMO, FundingPips, The5ers. Know exactly how much room you have before a limit breach. Never blow a challenge again."
             />
             <FeatureCard
               icon={
@@ -198,21 +198,55 @@ export default function Landing() {
                   <polyline points="17 6 23 6 23 12" />
                 </svg>
               }
-              title="Track Your Progress"
-              description="Equity curve, rolling metrics, streak analysis, risk ratios. Watch yourself improve over weeks and months."
+              title="Auto-Sync From Your Broker"
+              description="Connect Zerodha or Angel One. Trades import automatically — no more CSV exports. See your analytics update in real-time as you trade."
             />
           </div>
         </section>
 
+        {/* What makes us different */}
+        <section className="max-w-6xl mx-auto px-6 py-20">
+          <h2 className="text-3xl font-bold text-white text-center mb-4">
+            Not Another Stats Dashboard.
+          </h2>
+          <p className="text-gray-400 text-center max-w-2xl mx-auto mb-12">
+            Other tools show you numbers. TradeLoop shows you the exact dollar cost of every behavioral leak
+            and what your equity curve would look like without them.
+          </p>
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="card border-accent/20 p-6">
+              <div className="text-accent text-sm font-semibold uppercase tracking-wider mb-2">Counterfactual Insights</div>
+              <h3 className="text-xl font-bold text-white mb-2">"Revenge trading cost you $47,230"</h3>
+              <p className="text-gray-400 text-sm">Every behavioral pattern comes with the exact dollar impact, a what-if equity curve, and a specific recommendation. Not vague advice — math.</p>
+            </div>
+            <div className="card border-accent/20 p-6">
+              <div className="text-accent text-sm font-semibold uppercase tracking-wider mb-2">Prop Firm Mode</div>
+              <h3 className="text-xl font-bold text-white mb-2">Never Blow a Challenge Again</h3>
+              <p className="text-gray-400 text-sm">Real-time drawdown tracking for FTMO, FundingPips, The5ers. See your daily loss limit, max drawdown, and consistency score — with alerts before you breach.</p>
+            </div>
+            <div className="card border-accent/20 p-6">
+              <div className="text-accent text-sm font-semibold uppercase tracking-wider mb-2">Trades on Charts</div>
+              <h3 className="text-xl font-bold text-white mb-2">See Your Entries on Price Action</h3>
+              <p className="text-gray-400 text-sm">TradingView-powered candlestick charts with your trade markers. See exactly where you entered and exited, with P&L shading.</p>
+            </div>
+            <div className="card border-accent/20 p-6">
+              <div className="text-accent text-sm font-semibold uppercase tracking-wider mb-2">Weekly Intelligence</div>
+              <h3 className="text-xl font-bold text-white mb-2">Your Trading Report Card</h3>
+              <p className="text-gray-400 text-sm">Every Sunday: a graded report with week-over-week comparison, top insights ranked by dollar impact, and one specific thing to fix next week.</p>
+            </div>
+          </div>
+        </section>
+
+        {/* How it works */}
         <section className="max-w-4xl mx-auto px-6 py-20">
           <h2 className="text-3xl font-bold text-white text-center mb-12">
-            Three Steps. Two Minutes. Zero Guesswork.
+            Connect. Analyze. Improve.
           </h2>
           <div className="grid md:grid-cols-3 gap-8">
             {[
-              { step: "01", title: "Upload", desc: "Export your trades from Zerodha, MT4, or any broker. Drop the CSV." },
-              { step: "02", title: "Analyze", desc: "TradeLoop crunches every trade through 50+ metrics and pattern detectors." },
-              { step: "03", title: "Improve", desc: "See exactly where you're leaking money. Fix it tomorrow morning." },
+              { step: "01", title: "Connect", desc: "Link your Zerodha or Angel One account. Trades sync automatically. Or upload a CSV." },
+              { step: "02", title: "Discover", desc: "See exactly where you're leaking money — with dollar amounts and what-if scenarios." },
+              { step: "03", title: "Improve", desc: "Weekly grades, specific recommendations, and prop firm compliance tracking." },
             ].map((s) => (
               <div key={s.step} className="text-center">
                 <div className="text-accent font-mono text-sm mb-2">{s.step}</div>
@@ -223,13 +257,59 @@ export default function Landing() {
           </div>
         </section>
 
+        {/* Pricing */}
+        <section className="max-w-5xl mx-auto px-6 py-20">
+          <h2 className="text-3xl font-bold text-white text-center mb-12">Simple Pricing</h2>
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="card p-6 text-center">
+              <div className="text-sm text-gray-500 uppercase mb-2">Free</div>
+              <div className="text-3xl font-bold text-white mb-1">$0</div>
+              <div className="text-sm text-gray-500 mb-6">50 trades/month</div>
+              <ul className="text-sm text-gray-400 space-y-2 text-left mb-6">
+                <li>CSV upload</li>
+                <li>Basic analytics</li>
+                <li>Behavioral detection</li>
+              </ul>
+              <Link to="/register" className="btn-secondary w-full block text-center">Get Started</Link>
+            </div>
+            <div className="card p-6 text-center border-accent/40 relative">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-accent text-bg-primary text-xs font-bold px-3 py-1 rounded-full">POPULAR</div>
+              <div className="text-sm text-accent uppercase mb-2">Pro</div>
+              <div className="text-3xl font-bold text-white mb-1">$12<span className="text-lg text-gray-500">/mo</span></div>
+              <div className="text-sm text-gray-500 mb-6">Unlimited trades</div>
+              <ul className="text-sm text-gray-400 space-y-2 text-left mb-6">
+                <li>Everything in Free</li>
+                <li>Broker auto-sync</li>
+                <li>Counterfactual insights</li>
+                <li>Weekly intelligence reports</li>
+                <li>Trade charts</li>
+              </ul>
+              <Link to="/register" className="btn-primary w-full block text-center">Start Free Trial</Link>
+            </div>
+            <div className="card p-6 text-center">
+              <div className="text-sm text-gray-500 uppercase mb-2">Prop Trader</div>
+              <div className="text-3xl font-bold text-white mb-1">$18<span className="text-lg text-gray-500">/mo</span></div>
+              <div className="text-sm text-gray-500 mb-6">Multi-account</div>
+              <ul className="text-sm text-gray-400 space-y-2 text-left mb-6">
+                <li>Everything in Pro</li>
+                <li>Prop firm compliance</li>
+                <li>Real-time drawdown alerts</li>
+                <li>Multi-account tracking</li>
+                <li>Consistency rule monitor</li>
+              </ul>
+              <Link to="/register" className="btn-primary w-full block text-center">Start Free Trial</Link>
+            </div>
+          </div>
+        </section>
+
+        {/* CTA */}
         <section className="max-w-4xl mx-auto px-6 py-20 text-center">
           <div className="card p-12 border-accent/20">
             <h2 className="text-3xl font-bold text-white mb-4">
-              Ready to read your trading story?
+              Stop guessing. Start knowing.
             </h2>
             <p className="text-gray-400 mb-8 max-w-lg mx-auto">
-              50 trades/month analyzed free. No credit card needed. See your patterns in under 2 minutes.
+              Your next 50 trades analyzed free. See exactly where your money goes — and how to keep more of it.
             </p>
             <Link to="/register" className="btn-primary text-lg px-10 py-4">
               Start Free

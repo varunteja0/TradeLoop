@@ -8,6 +8,10 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Upload from "./pages/Upload";
 import Settings from "./pages/Settings";
+import BrokerConnect from "./pages/BrokerConnect";
+import Insights from "./pages/Insights";
+import PropDashboard from "./pages/PropDashboard";
+import WeeklyReport from "./pages/WeeklyReport";
 import NotFound from "./pages/NotFound";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -48,6 +52,38 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Settings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/connect"
+            element={
+              <ProtectedRoute>
+                <BrokerConnect />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/insights"
+            element={
+              <ProtectedRoute>
+                <Insights />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/prop"
+            element={
+              <ProtectedRoute>
+                <PropDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/report"
+            element={
+              <ProtectedRoute>
+                <WeeklyReport />
               </ProtectedRoute>
             }
           />
