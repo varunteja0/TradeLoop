@@ -10,44 +10,61 @@
 
 body {
   font-family: "Inter", system-ui, -apple-system, sans-serif;
-  background-color: #0a0a0f;
+  background-color: #07070c;
   color: #e5e7eb;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: #0a0a0f;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #2a2a3a;
-  border-radius: 3px;
+  background: #252535;
+  border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3a3a4a;
+  background: #353550;
 }
 
 @layer components {
   .card {
-    @apply bg-bg-card border border-border rounded-xl p-5;
+    @apply bg-[#0d0d14] border border-[#1a1a2e] rounded-2xl p-5
+           shadow-[0_1px_3px_rgba(0,0,0,0.4)] backdrop-blur-sm;
+  }
+  .card-glass {
+    @apply bg-[#0d0d14]/60 border border-[#1a1a2e]/60 rounded-2xl p-5
+           backdrop-blur-xl shadow-[0_4px_24px_rgba(0,0,0,0.3)];
+  }
+  .card-glow {
+    @apply bg-gradient-to-br from-[#0d0d14] to-[#0f0f1a] border border-accent/10 rounded-2xl p-5
+           shadow-[0_0_30px_rgba(0,212,170,0.05)];
   }
   .btn-primary {
-    @apply bg-accent text-bg-primary font-semibold px-6 py-3 rounded-lg
-           hover:brightness-110 transition-all duration-200 cursor-pointer
-           disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-gradient-to-r from-accent to-emerald-400 text-[#07070c] font-semibold px-6 py-3 rounded-xl
+           hover:shadow-[0_0_20px_rgba(0,212,170,0.3)] hover:scale-[1.02]
+           transition-all duration-300 cursor-pointer
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100;
   }
   .btn-secondary {
-    @apply border border-border text-gray-300 font-medium px-6 py-3 rounded-lg
-           hover:bg-bg-hover transition-all duration-200 cursor-pointer;
+    @apply border border-[#1a1a2e] text-gray-300 font-medium px-6 py-3 rounded-xl
+           hover:bg-[#12121f] hover:border-[#252540] transition-all duration-300 cursor-pointer;
   }
   .input-field {
-    @apply w-full bg-bg-input border border-border rounded-lg px-4 py-3
-           text-gray-200 placeholder-gray-500 focus:outline-none focus:border-accent
-           transition-colors duration-200;
+    @apply w-full bg-[#0a0a12] border border-[#1a1a2e] rounded-xl px-4 py-3
+           text-gray-200 placeholder-gray-600 focus:outline-none focus:border-accent/50
+           focus:shadow-[0_0_0_3px_rgba(0,212,170,0.1)]
+           transition-all duration-300;
+  }
+  .stat-value {
+    @apply text-2xl font-bold font-mono tracking-tight;
+  }
+  .section-label {
+    @apply text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-500;
   }
 }
 
@@ -57,4 +74,20 @@ body {
 }
 .animate-slide-in {
   animation: slide-in 0.3s ease-out;
+}
+
+@keyframes fade-up {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.animate-fade-up {
+  animation: fade-up 0.4s ease-out;
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(0,212,170,0.05); }
+  50% { box-shadow: 0 0 40px rgba(0,212,170,0.1); }
+}
+.animate-glow {
+  animation: glow-pulse 3s ease-in-out infinite;
 }
