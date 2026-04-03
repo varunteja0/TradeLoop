@@ -9,12 +9,17 @@ export default function Login() {
   const [error, setError] = useState("");
   const login = useAuth((s) => s.login);
   const loading = useAuth((s) => s.loading);
+  const user = useAuth((s) => s.user);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
     document.title = "Log In — TradeLoop";
   }, []);
+
+  useEffect(() => {
+    if (user) navigate("/dashboard", { replace: true });
+  }, [user, navigate]);
 
   useEffect(() => {
     if (searchParams.get("expired") === "true") {

@@ -22,6 +22,8 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const user = useAuth((s) => s.user);
+  const hydrated = useAuth((s) => s.hydrated);
+  if (!hydrated) return null;
   if (!user) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }

@@ -6,40 +6,30 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-let isRedirecting = false;
-
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("tradeloop_token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-
-  if (import.meta.env.DEV) {
-    console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`, config.data ?? "");
-  }
-
   return config;
 });
 
+let isHandling401 = false;
+
 api.interceptors.response.use(
-  (response) => {
-    if (import.meta.env.DEV) {
-      console.log(`[API] ${response.status} ${response.config.url}`, response.data);
-    }
-    return response;
-  },
+  (response) => response,
   (error) => {
-    if (import.meta.env.DEV) {
-      console.error(`[API] ${error.response?.status ?? "ERR"} ${error.config?.url}`, error.response?.data ?? error.message);
-    }
-
-    if (error.response?.status === 401 && !isRedirecting) {
-      isRedirecting = true;
+    if (
+      error.response?.status === 401 &&
+      !isHandling401 &&
+      !error.config?.url?.includes("/auth/me") &&
+      !error.config?.url?.includes("/auth/login") &&
+      !error.config?.url?.includes("/auth/register")
+    ) {
+      isHandling401 = true;
       useAuth.getState().logout();
-      window.location.href = "/login";
-      setTimeout(() => { isRedirecting = false; }, 2000);
+      setTimeout(() => { isHandling401 = false; }, 1000);
     }
-
     return Promise.reject(error);
   }
 );

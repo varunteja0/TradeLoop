@@ -6,6 +6,7 @@ interface AuthState {
   user: User | null;
   token: string | null;
   loading: boolean;
+  hydrated: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => void;
@@ -19,14 +20,19 @@ export const useAuth = create<AuthState>((set, get) => ({
   user: null,
   token: null,
   loading: false,
+  hydrated: false,
 
   hydrate: async () => {
     const token = localStorage.getItem("tradeloop_token");
     const userStr = localStorage.getItem("tradeloop_user");
-    if (!token || !userStr) return;
+    if (!token || !userStr) {
+      set({ hydrated: true });
+      return;
+    }
 
     try {
-      set({ token, user: JSON.parse(userStr) });
+      const user = JSON.parse(userStr);
+      set({ token, user, hydrated: true });
       const { data } = await api.get("/auth/me");
       set({ user: data });
       localStorage.setItem("tradeloop_user", JSON.stringify(data));
@@ -34,7 +40,7 @@ export const useAuth = create<AuthState>((set, get) => ({
       localStorage.removeItem("tradeloop_token");
       localStorage.removeItem("tradeloop_refresh_token");
       localStorage.removeItem("tradeloop_user");
-      set({ user: null, token: null });
+      set({ user: null, token: null, hydrated: true });
     }
   },
 
