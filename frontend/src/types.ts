@@ -177,6 +177,7 @@ export interface Trade {
   setup_type: string | null;
   notes: string | null;
   fees: number;
+  mood: string | null;
 }
 
 export interface User {

@@ -68,3 +68,9 @@ async def risk_metrics(tz: int = Query(None), db: AsyncSession = Depends(get_db)
 async def streaks(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     trades = await trade_service.get_user_trades(db, user, limit=10000)
     return await analytics_service.get_streaks(trades)
+
+
+@router.get("/emotions")
+async def emotion_analysis(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    trades = await trade_service.get_user_trades(db, user, limit=10000)
+    return analytics_service._analytics.emotion_analysis(trades)

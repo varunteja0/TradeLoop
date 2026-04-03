@@ -97,6 +97,28 @@ async def delete_all_trades(
     await trade_service.delete_all_trades(db, user)
 
 
+@router.patch("/{trade_id}")
+async def update_trade(
+    trade_id: str,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Update trade fields (mood, notes, setup_type)."""
+    from app.models.trade import Trade
+    from sqlalchemy import select
+    result = await db.execute(select(Trade).where(Trade.id == trade_id, Trade.user_id == user.id))
+    trade = result.scalar_one_or_none()
+    if not trade:
+        raise HTTPException(status_code=404, detail="Trade not found")
+    allowed = {"mood", "notes", "setup_type"}
+    for key, value in body.items():
+        if key in allowed:
+            setattr(trade, key, value)
+    await db.flush()
+    return {"status": "updated", "trade_id": trade_id}
+
+
 @router.get("/export")
 async def export_trades(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     csv_content = await trade_service.export_csv(db, user)

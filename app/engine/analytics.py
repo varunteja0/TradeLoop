@@ -454,6 +454,52 @@ class TradeAnalytics:
         return result
 
     # =====================================================================
+    # EMOTION / MOOD ANALYSIS
+    # =====================================================================
+    def emotion_analysis(self, trades: list) -> dict:
+        """Correlate emotional tags with performance."""
+        tagged = [t for t in trades if getattr(t, 'mood', None)]
+        if len(tagged) < 5:
+            return {"has_data": False, "message": "Tag at least 5 trades with emotions to see correlations"}
+
+        mood_stats: dict = {}
+        for t in tagged:
+            mood = t.mood
+            if mood not in mood_stats:
+                mood_stats[mood] = {"trades": 0, "wins": 0, "total_pnl": 0.0, "pnls": []}
+            mood_stats[mood]["trades"] += 1
+            mood_stats[mood]["total_pnl"] += t.pnl
+            mood_stats[mood]["pnls"].append(t.pnl)
+            if t.pnl > 0:
+                mood_stats[mood]["wins"] += 1
+
+        result = {}
+        for mood, stats in mood_stats.items():
+            result[mood] = {
+                "trades": stats["trades"],
+                "win_rate": round(stats["wins"] / stats["trades"] * 100, 2),
+                "total_pnl": round(stats["total_pnl"], 2),
+                "avg_pnl": round(stats["total_pnl"] / stats["trades"], 2),
+            }
+
+        best_mood = max(result.items(), key=lambda x: x[1]["avg_pnl"])
+        worst_mood = min(result.items(), key=lambda x: x[1]["avg_pnl"])
+
+        return {
+            "has_data": True,
+            "per_mood": result,
+            "best_mood": {"mood": best_mood[0], **best_mood[1]},
+            "worst_mood": {"mood": worst_mood[0], **worst_mood[1]},
+            "total_tagged": len(tagged),
+            "total_trades": len(trades),
+            "tag_rate": round(len(tagged) / len(trades) * 100, 1) if trades else 0,
+            "insight": (
+                f"You perform best when '{best_mood[0]}' (avg ${best_mood[1]['avg_pnl']}/trade) "
+                f"and worst when '{worst_mood[0]}' (avg ${worst_mood[1]['avg_pnl']}/trade)."
+            ) if len(result) >= 2 else "Tag more trades to see patterns.",
+        }
+
+    # =====================================================================
     # BEHAVIORAL ANALYSIS (delegated to behavioral.py)
     # =====================================================================
     def behavioral_analysis(self, trades: list[Trade]) -> dict:

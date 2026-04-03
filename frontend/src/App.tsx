@@ -17,6 +17,7 @@ const WeeklyReport = lazy(() => import("./pages/WeeklyReport"));
 const Upload = lazy(() => import("./pages/Upload"));
 const Settings = lazy(() => import("./pages/Settings"));
 const BrokerConnect = lazy(() => import("./pages/BrokerConnect"));
+const TradeReplay = lazy(() => import("./pages/TradeReplay"));
 const Demo = lazy(() => import("./pages/Demo"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -104,6 +105,14 @@ export default function App() {
                   element={
                     <ProtectedRoute>
                       <WeeklyReport />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/replay/:tradeId"
+                  element={
+                    <ProtectedRoute>
+                      <TradeReplay />
                     </ProtectedRoute>
                   }
                 />

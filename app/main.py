@@ -14,7 +14,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.config import get_settings
 from app.db import engine, Base
-from app.api import auth, trades, analytics, payments, insights, prop_accounts, broker_connect, reports
+from app.api import auth, trades, analytics, payments, insights, prop_accounts, broker_connect, reports, market_data
 
 from app.logging_config import setup_logging
 setup_logging()
@@ -124,6 +124,7 @@ for prefix in (V1_PREFIX, COMPAT_PREFIX):
     app.include_router(prop_accounts.router, prefix=prefix)
     app.include_router(broker_connect.router, prefix=prefix)
     app.include_router(reports.router, prefix=prefix)
+    app.include_router(market_data.router, prefix=prefix)
 
 
 @app.get("/api/health")

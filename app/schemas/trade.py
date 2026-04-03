@@ -18,6 +18,7 @@ class TradeCreate(BaseModel):
     setup_type: Optional[str] = None
     notes: Optional[str] = None
     fees: float = 0.0
+    mood: Optional[str] = None
 
 
 class TradeOut(BaseModel):
@@ -33,6 +34,7 @@ class TradeOut(BaseModel):
     setup_type: Optional[str]
     notes: Optional[str]
     fees: float
+    mood: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

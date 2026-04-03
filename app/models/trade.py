@@ -42,6 +42,7 @@ class Trade(Base):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     fees: Mapped[float] = mapped_column(Float, default=0.0)
     source: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # "csv", "zerodha", "angelone"
+    mood: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)  # "confident", "fearful", "revenge", "fomo", "bored", "calm"
     created_at: Mapped[datetime] = mapped_column(DateTime(), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(), default=_utcnow, onupdate=_utcnow)
 

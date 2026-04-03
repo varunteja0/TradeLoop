@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { Link } from "react-router-dom";
 import api from "../api/client";
 import type { Trade } from "../types";
 
@@ -93,6 +94,20 @@ export default function TradeTable() {
           );
         })
         .finally(() => setDeletingId(null));
+    },
+    [fetchTrades],
+  );
+
+  const handleMoodChange = useCallback(
+    (tradeId: string, mood: string) => {
+      setTrades((prev) =>
+        prev.map((t) =>
+          t.id === tradeId ? { ...t, mood: mood || null } : t,
+        ),
+      );
+      api.patch(`/trades/${tradeId}`, { mood: mood || null }).catch(() => {
+        fetchTrades();
+      });
     },
     [fetchTrades],
   );
@@ -249,6 +264,12 @@ export default function TradeTable() {
                 <th className="text-left pb-3 pl-2 hidden md:table-cell" scope="col">
                   Setup
                 </th>
+                <th className="text-left pb-3 px-2 hidden md:table-cell" scope="col">
+                  Mood
+                </th>
+                <th className="text-right pb-3 px-2" scope="col">
+                  Replay
+                </th>
                 <th className="pb-3 pl-2 w-10" scope="col">
                   <span className="sr-only">Actions</span>
                 </th>
@@ -306,6 +327,31 @@ export default function TradeTable() {
                   </td>
                   <td className="py-2 pl-2 text-xs text-gray-500 hidden md:table-cell">
                     {t.setup_type || "—"}
+                  </td>
+                  <td className="py-2 px-2 hidden md:table-cell">
+                    <select
+                      value={t.mood || ""}
+                      onChange={(e) =>
+                        handleMoodChange(t.id, e.target.value)
+                      }
+                      className="bg-transparent text-xs text-gray-400 border-0 focus:ring-0 cursor-pointer"
+                    >
+                      <option value="">—</option>
+                      <option value="confident">😎 Confident</option>
+                      <option value="calm">😌 Calm</option>
+                      <option value="fearful">😰 Fearful</option>
+                      <option value="fomo">🔥 FOMO</option>
+                      <option value="revenge">😤 Revenge</option>
+                      <option value="bored">😑 Bored</option>
+                    </select>
+                  </td>
+                  <td className="py-2 px-2 text-right">
+                    <Link
+                      to={`/replay/${t.id}`}
+                      className="text-accent hover:underline text-xs"
+                    >
+                      Replay
+                    </Link>
                   </td>
                   <td className="py-2 pl-2">
                     <button
