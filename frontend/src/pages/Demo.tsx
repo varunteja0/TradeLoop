@@ -5,6 +5,8 @@ import EquityCurve from "../components/EquityCurve";
 import TimeHeatmap from "../components/TimeHeatmap";
 import BehaviorAlerts from "../components/BehaviorAlerts";
 import Logo from "../components/Logo";
+import MarketTicker from "../components/MarketTicker";
+import LiveChart from "../components/LiveChart";
 
 const DEMO_DATA: Analytics = {
   overview: {
@@ -204,6 +206,7 @@ export default function Demo() {
 
   return (
     <div className="min-h-screen bg-bg-primary">
+      <MarketTicker />
       <nav className="sticky top-0 z-50 bg-bg-primary/80 backdrop-blur-md border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14">
           <Logo linkTo="/" size="sm" />
@@ -294,6 +297,8 @@ export default function Demo() {
         {DEMO_DATA.equity_curve.cumulative_pnl.length > 0 && (
           <EquityCurve data={DEMO_DATA.equity_curve.cumulative_pnl} />
         )}
+
+        <LiveChart symbol="NSE:NIFTY" height={400} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div>

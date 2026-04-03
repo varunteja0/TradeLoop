@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../store/auth";
 import Logo from "../components/Logo";
+import MarketTicker from "../components/MarketTicker";
 
 export default function Landing() {
   const user = useAuth((s) => s.user);
@@ -20,6 +21,7 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-bg-primary">
+      <MarketTicker />
       <nav className="relative flex items-center justify-between px-6 py-4 max-w-7xl mx-auto">
         <Logo linkTo="/" />
 

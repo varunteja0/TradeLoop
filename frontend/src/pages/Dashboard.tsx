@@ -13,6 +13,9 @@ import SymbolTable from "../components/SymbolTable";
 import StreakDisplay from "../components/StreakDisplay";
 import TradeTable from "../components/TradeTable";
 import TradeChart from "../components/TradeChart";
+import MarketTicker from "../components/MarketTicker";
+import LiveChart from "../components/LiveChart";
+import LivePortfolio from "../components/LivePortfolio";
 
 type TabKey = "overview" | "behavior" | "time" | "symbols" | "trades";
 
@@ -143,6 +146,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-bg-primary">
+      <MarketTicker />
       <nav className="sticky top-0 z-50 bg-bg-primary/80 backdrop-blur-md border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14">
           <Logo linkTo="/" size="sm" />
@@ -303,6 +307,13 @@ export default function Dashboard() {
                     <EquityCurve data={filteredEquityCurve} />
                   )}
 
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div className="lg:col-span-2">
+                      <LiveChart symbol="NSE:NIFTY" height={400} />
+                    </div>
+                    <LivePortfolio />
+                  </div>
+
                   {analytics?.risk_metrics && (
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <MetricCard
@@ -358,6 +369,9 @@ export default function Dashboard() {
               {activeTab === "symbols" && analytics?.symbols?.per_symbol && (
                 <div className="space-y-4">
                   <SymbolTable perSymbol={analytics.symbols.per_symbol} onSymbolClick={(sym) => setSelectedSymbol(sym === selectedSymbol ? null : sym)} selectedSymbol={selectedSymbol} />
+                  {selectedSymbol && (
+                    <LiveChart symbol={`NSE:${selectedSymbol}`} height={350} />
+                  )}
                   {selectedSymbol && chartTrades.length > 0 && (
                     <TradeChart trades={chartTrades} symbol={selectedSymbol} />
                   )}
