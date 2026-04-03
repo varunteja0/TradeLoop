@@ -5,7 +5,7 @@ import hmac
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +13,7 @@ from app.config import get_settings
 from app.db import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
+from app.services.audit_service import audit_service
 
 logger = logging.getLogger("tradeloop.payments")
 
@@ -116,6 +117,7 @@ async def create_order(
 
 @router.post("/payments/verify", response_model=VerifyPaymentResponse)
 async def verify_payment(
+    request: Request,
     body: VerifyPaymentRequest,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -130,6 +132,7 @@ async def verify_payment(
         user.plan = body.plan
         await db.commit()
         await db.refresh(user)
+        await audit_service.log(db, user.id, "plan_upgrade", details=f"upgraded to {body.plan} (dev)", ip=request.client.host)
         return VerifyPaymentResponse(verified=True, plan=body.plan, message=f"Dev mode — upgraded to {body.plan}")
 
     expected_signature = hmac.new(
@@ -146,6 +149,7 @@ async def verify_payment(
     await db.commit()
     await db.refresh(user)
     logger.info("User %s upgraded to %s (payment_id=%s)", user.id, body.plan, body.razorpay_payment_id)
+    await audit_service.log(db, user.id, "plan_upgrade", details=f"upgraded to {body.plan}", ip=request.client.host)
 
     return VerifyPaymentResponse(verified=True, plan=body.plan, message=f"Payment verified — upgraded to {body.plan}")
 

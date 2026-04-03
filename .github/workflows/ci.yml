@@ -21,8 +21,10 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt pytest pytest-asyncio httpx aiosqlite
 
-      - name: Type check (compile all)
-        run: python -m compileall app/ -q
+      - name: Type check
+        run: |
+          pip install mypy
+          mypy app/ --ignore-missing-imports --no-strict-optional --allow-untyped-defs
 
       - name: Run tests
         run: python -m pytest tests/ -v --tb=short
@@ -54,22 +56,26 @@ jobs:
       - name: Build
         run: npx vite build
 
-  deploy-backend:
-    name: Deploy Backend
+  deploy-staging:
+    name: Deploy to Staging
     needs: [backend, frontend]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: staging
     steps:
       - uses: actions/checkout@v4
-      - name: Deploy to Railway
-        run: echo "Railway deployment configured via railway.toml — connect Railway GitHub integration"
+      - name: Deploy to staging
+        run: echo "Deploy to staging environment via Railway/Render"
 
-  deploy-frontend:
-    name: Deploy Frontend
-    needs: [backend, frontend]
+  deploy-production:
+    name: Deploy to Production
+    needs: [deploy-staging]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+      url: https://tradeloop.io
     steps:
       - uses: actions/checkout@v4
-      - name: Deploy to Vercel
-        run: echo "Vercel deployment configured via vercel.json — connect Vercel GitHub integration"
+      - name: Deploy to production
+        run: echo "Deploy to production — requires approval in GitHub environment settings"

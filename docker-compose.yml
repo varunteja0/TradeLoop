@@ -1,17 +1,35 @@
 version: "3.8"
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: tradeloop
+      POSTGRES_USER: tradeloop
+      POSTGRES_PASSWORD: tradeloop
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tradeloop"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   backend:
     build: .
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=sqlite+aiosqlite:///./tradeloop.db
+      - DATABASE_URL=postgresql+asyncpg://tradeloop:tradeloop@postgres:5432/tradeloop
       - ENVIRONMENT=development
       - FRONTEND_URL=http://localhost:5173
+    depends_on:
+      postgres:
+        condition: service_healthy
     volumes:
       - ./app:/app/app
-      - ./tradeloop.db:/app/tradeloop.db
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
@@ -30,3 +48,6 @@ services:
     command: sh -c "npm install && npx vite --host 0.0.0.0 --port 5173"
     depends_on:
       - backend
+
+volumes:
+  pgdata:

@@ -8,12 +8,9 @@ from app.db import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.schemas.trade import AnalyticsResponse
-from app.services.analytics_service import AnalyticsService
-from app.services.trade_service import TradeService
+from app.services import analytics_svc as analytics_service, trade_svc as trade_service
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
-analytics_service = AnalyticsService()
-trade_service = TradeService()
 
 
 def _tz(user: User, tz: int = None) -> int:

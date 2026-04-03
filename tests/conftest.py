@@ -5,6 +5,9 @@ from datetime import datetime, timezone, timedelta
 from types import SimpleNamespace
 from typing import AsyncGenerator, List
 
+import os
+os.environ["ENVIRONMENT"] = "testing"
+
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient

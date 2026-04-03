@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
+from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from pydantic import EmailStr
@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
 from app.dependencies import get_current_user
+from app.rate_limit import limiter
 from app.models.user import User
 from app.schemas.auth import (
     RegisterRequest, LoginRequest, AuthResponse, UserOut,
@@ -20,13 +21,16 @@ from app.security import (
     create_access_token, create_refresh_token,
     decode_access_token, decode_refresh_token, TokenError,
 )
+from app.services.audit_service import audit_service
+from app.models.audit_log import AuditLog
 
 logger = logging.getLogger("tradeloop.auth")
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
-async def register(req: RegisterRequest, request: Request, db: AsyncSession = Depends(get_db)):
+@limiter.limit("3/minute")
+async def register(request: Request, req: RegisterRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == req.email))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Email already registered")
@@ -40,6 +44,7 @@ async def register(req: RegisterRequest, request: Request, db: AsyncSession = De
     await db.flush()
 
     logger.info("User registered: %s", user.email)
+    await audit_service.log(db, user.id, "register", ip=request.client.host)
 
     access_token = create_access_token({"sub": str(user.id)})
     refresh_token = create_refresh_token({"sub": str(user.id)})
@@ -52,15 +57,28 @@ async def register(req: RegisterRequest, request: Request, db: AsyncSession = De
 
 
 @router.post("/login", response_model=AuthResponse)
-async def login(req: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")
+async def login(request: Request, req: LoginRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == req.email))
     user = result.scalar_one_or_none()
 
+    if user and user.locked_until and user.locked_until > datetime.now(timezone.utc):
+        raise HTTPException(status_code=429, detail="Account temporarily locked. Try again in 15 minutes.")
+
     if not user or not verify_password(req.password, user.hashed_password):
+        if user:
+            user.failed_login_count = (user.failed_login_count or 0) + 1
+            if user.failed_login_count >= 5:
+                user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
+            await db.flush()
         logger.warning("Failed login attempt for: %s", req.email)
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
+    user.failed_login_count = 0
+    user.locked_until = None
+
     logger.info("User logged in: %s", user.email)
+    await audit_service.log(db, user.id, "login", ip=request.client.host)
     access_token = create_access_token({"sub": str(user.id)})
     refresh_token = create_refresh_token({"sub": str(user.id)})
     return AuthResponse(
@@ -118,6 +136,7 @@ async def update_profile(
 
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
 async def change_password(
+    request: Request,
     req: ChangePasswordRequest,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -127,10 +146,12 @@ async def change_password(
     user.hashed_password = hash_password(req.new_password)
     await db.flush()
     logger.info("Password changed: %s", user.email)
+    await audit_service.log(db, user.id, "password_change", ip=request.client.host)
 
 
 @router.post("/forgot-password")
-async def forgot_password(email: EmailStr = Body(..., embed=True), db: AsyncSession = Depends(get_db)):
+@limiter.limit("3/minute")
+async def forgot_password(request: Request, email: EmailStr = Body(..., embed=True), db: AsyncSession = Depends(get_db)):
     """Send password reset email."""
     from app.services.email_service import EmailService
     result = await db.execute(select(User).where(User.email == email))
@@ -168,3 +189,27 @@ async def reset_password(token: str = Body(...), new_password: str = Body(...), 
     user.hashed_password = hash_password(new_password)
     await db.flush()
     return {"message": "Password reset successfully"}
+
+
+@router.get("/audit-log")
+async def audit_log(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(AuditLog)
+        .where(AuditLog.user_id == user.id)
+        .order_by(AuditLog.created_at.desc())
+        .limit(50)
+    )
+    entries = result.scalars().all()
+    return [
+        {
+            "id": e.id,
+            "action": e.action,
+            "details": e.details,
+            "ip_address": e.ip_address,
+            "created_at": e.created_at.isoformat() if e.created_at else None,
+        }
+        for e in entries
+    ]

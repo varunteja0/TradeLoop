@@ -4,26 +4,28 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, UploadFile, File, Query, status
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db import get_db
 from app.dependencies import get_current_user
+from app.rate_limit import limiter
 from app.models.user import User
 from app.schemas.trade import TradeOut, TradeListResponse, UploadResponse
 from app.services.background import run_post_upload
-from app.services.trade_service import TradeService
+from app.services import trade_svc as trade_service
 
 router = APIRouter(prefix="/trades", tags=["trades"])
-trade_service = TradeService()
 settings = get_settings()
 UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 
 
 @router.post("/upload", response_model=UploadResponse)
+@limiter.limit("10/minute")
 async def upload_csv(
+    request: Request,
     file: UploadFile = File(...),
     broker: str = Query("auto"),
     background_tasks: BackgroundTasks = BackgroundTasks(),
@@ -67,9 +69,13 @@ async def list_trades(
     user: User = Depends(get_current_user),
 ):
     result = await trade_service.list_trades(db, user, page, per_page, symbol, side, sort_by, sort_dir, search)
+    total_pages = max(1, (result.total + per_page - 1) // per_page)
     return TradeListResponse(
         trades=[TradeOut(id=str(t.id), **{k: getattr(t, k) for k in TradeOut.model_fields if k != "id"}) for t in result.trades],
         total=result.total, page=result.page, per_page=result.per_page,
+        total_pages=total_pages,
+        has_next=page < total_pages,
+        has_prev=page > 1,
     )
 
 
@@ -98,24 +104,11 @@ async def delete_all_trades(
 
 
 @router.patch("/{trade_id}")
-async def update_trade(
-    trade_id: str,
-    body: dict,
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    """Update trade fields (mood, notes, setup_type)."""
-    from app.models.trade import Trade
-    from sqlalchemy import select
-    result = await db.execute(select(Trade).where(Trade.id == trade_id, Trade.user_id == user.id))
-    trade = result.scalar_one_or_none()
-    if not trade:
+async def update_trade(trade_id: str, body: dict, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    try:
+        await trade_service.update_trade(db, user, trade_id, body)
+    except LookupError:
         raise HTTPException(status_code=404, detail="Trade not found")
-    allowed = {"mood", "notes", "setup_type"}
-    for key, value in body.items():
-        if key in allowed:
-            setattr(trade, key, value)
-    await db.flush()
     return {"status": "updated", "trade_id": trade_id}
 
 

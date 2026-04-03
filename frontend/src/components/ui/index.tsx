@@ -143,3 +143,109 @@ export function EmptyState({ icon = "📊", title, description, action }: EmptyP
     </div>
   );
 }
+
+// ============ MODAL ============
+interface ModalProps {
+  open: boolean;
+  onClose: () => void;
+  title?: string;
+  children: ReactNode;
+}
+
+export function Modal({ open, onClose, title, children }: ModalProps) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={title}>
+      <div className="fixed inset-0 bg-black/60" onClick={onClose} />
+      <div className="relative bg-bg-card border border-border rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 z-10">
+        {title && (
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-white">{title}</h2>
+            <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors" aria-label="Close">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+            </button>
+          </div>
+        )}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ============ SELECT ============
+interface SelectOption { value: string; label: string }
+interface SelectProps {
+  label?: string;
+  options: SelectOption[];
+  value: string;
+  onChange: (value: string) => void;
+  id?: string;
+  className?: string;
+}
+
+export function Select({ label, options, value, onChange, id, className = "" }: SelectProps) {
+  const selectId = id || label?.toLowerCase().replace(/\s+/g, "-");
+  return (
+    <div>
+      {label && <label htmlFor={selectId} className="block text-sm text-gray-400 mb-1.5">{label}</label>}
+      <select
+        id={selectId}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`w-full bg-bg-input border border-border rounded-lg px-4 py-3 text-gray-200 focus:outline-none focus:border-accent transition-colors duration-200 ${className}`}
+      >
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+// ============ TABS ============
+interface Tab { id: string; label: string }
+interface TabsProps {
+  tabs: Tab[];
+  activeId: string;
+  onChange: (id: string) => void;
+}
+
+export function Tabs({ tabs, activeId, onChange }: TabsProps) {
+  return (
+    <div className="flex gap-1 overflow-x-auto pb-1" role="tablist">
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          role="tab"
+          aria-selected={tab.id === activeId}
+          aria-controls={`panel-${tab.id}`}
+          onClick={() => onChange(tab.id)}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+            tab.id === activeId
+              ? "bg-accent text-bg-primary"
+              : "text-gray-400 hover:text-white hover:bg-bg-hover"
+          }`}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ============ TOOLTIP ============
+interface TooltipProps {
+  text: string;
+  children: ReactNode;
+}
+
+export function Tooltip({ text, children }: TooltipProps) {
+  return (
+    <span className="relative group inline-flex">
+      {children}
+      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-800 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+        {text}
+      </span>
+    </span>
+  );
+}

@@ -7,12 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
-from app.services.analytics_service import AnalyticsService
-from app.services.trade_service import TradeService
+from app.services import analytics_svc as analytics_service, trade_svc as trade_service
 
 router = APIRouter(prefix="/insights", tags=["insights"])
-analytics_service = AnalyticsService()
-trade_service = TradeService()
 
 
 @router.get("/full")

@@ -13,10 +13,12 @@
   "dependencies": {
     "@tanstack/react-query": "^5.96.1",
     "axios": "^1.7.0",
+    "i18next": "^26.0.3",
     "lightweight-charts": "^4.2.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-dropzone": "^14.2.3",
+    "react-i18next": "^17.0.2",
     "react-router-dom": "^6.23.0",
     "recharts": "^2.12.0",
     "zustand": "^4.5.0"

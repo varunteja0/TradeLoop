@@ -1,0 +1,34 @@
+{
+  "landing": {
+    "hero_title": "Your Trades Tell a Story.",
+    "hero_highlight": "Most Traders Never Read It.",
+    "hero_subtitle": "Upload your trade history. TradeLoop finds the patterns you can't see — revenge trades, best hours, worst setups, behavioral leaks — so you stop losing money to yourself.",
+    "cta_primary": "Upload Your First Trades Free",
+    "cta_secondary": "See How It Works",
+    "free_badge": "Free for your first 50 trades/month"
+  },
+  "common": {
+    "login": "Log In",
+    "register": "Sign Up",
+    "logout": "Log out",
+    "dashboard": "Dashboard",
+    "settings": "Settings",
+    "upload": "Upload",
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "confirm": "Confirm"
+  },
+  "auth": {
+    "welcome_back": "Welcome back",
+    "create_account": "Create your account",
+    "email": "Email",
+    "password": "Password",
+    "name": "Name",
+    "login_button": "Log In",
+    "register_button": "Create Account",
+    "no_account": "Don't have an account?",
+    "has_account": "Already have an account?"
+  }
+}

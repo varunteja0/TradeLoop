@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 import logging
-import sys
+import os
 import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.config import get_settings
 from app.db import engine, Base
-from app.api import auth, trades, analytics, payments, insights, prop_accounts, broker_connect, reports, market_data
+from app.rate_limit import limiter
+from app.api import auth, trades, analytics, payments, insights, prop_accounts, broker_connect, reports, market_data, admin
 
 from app.logging_config import setup_logging
 setup_logging()
@@ -22,30 +22,43 @@ logger = logging.getLogger("tradeloop")
 
 settings = get_settings()
 API_VERSION = "1"
-APP_VERSION = "4.0.0"
+APP_VERSION = "6.0.0"
 
-limiter = Limiter(key_func=get_remote_address)
-
-
-sentry_dsn = getattr(settings, 'sentry_dsn', '')
+sentry_dsn = getattr(settings, "sentry_dsn", "")
 if sentry_dsn:
-    try:
-        import sentry_sdk
-        sentry_sdk.init(dsn=sentry_dsn, traces_sample_rate=0.1, environment=settings.environment)
-        logger.info("Sentry initialized")
-    except ImportError:
-        logger.warning("sentry-sdk not installed, error tracking disabled")
+    import sentry_sdk
+    sentry_sdk.init(
+        dsn=sentry_dsn,
+        traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
+        release=f"tradeloop@{APP_VERSION}",
+        environment=settings.environment,
+    )
+    logger.info("Sentry initialized (release=%s)", APP_VERSION)
+
+
+OPENAPI_TAGS = [
+    {"name": "auth", "description": "Registration, login, token refresh, password management"},
+    {"name": "trades", "description": "Trade CRUD, CSV upload/export, mood tagging"},
+    {"name": "analytics", "description": "Full analytics, equity curve, risk metrics, emotions"},
+    {"name": "insights", "description": "Counterfactual dollar-value analysis"},
+    {"name": "prop-firm", "description": "Prop firm accounts and compliance tracking"},
+    {"name": "broker-connect", "description": "Broker connection and trade sync"},
+    {"name": "reports", "description": "Weekly intelligence reports"},
+    {"name": "market-data", "description": "Historical OHLC and trade replay"},
+    {"name": "payments", "description": "Subscription billing and plan management"},
+]
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("TradeLoop v%s starting up (env=%s)", APP_VERSION, settings.environment)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    logger.info("Database tables ready")
 
-    from app.services.background import register_background_handlers
-    register_background_handlers()
+    if settings.environment != "production":
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database tables created (dev mode)")
+    else:
+        logger.info("Production mode — use Alembic for migrations")
 
     yield
     logger.info("TradeLoop shutting down")
@@ -56,6 +69,9 @@ app = FastAPI(
     description="Trading behavior engine — the exact dollar cost of every mistake",
     version=APP_VERSION,
     lifespan=lifespan,
+    openapi_tags=OPENAPI_TAGS,
+    contact={"name": "TradeLoop Support", "email": "support@tradeloop.io"},
+    license_info={"name": "Proprietary"},
 )
 
 app.state.limiter = limiter
@@ -88,7 +104,7 @@ async def add_security_headers(request: Request, call_next):
 
 @app.middleware("http")
 async def add_request_metadata(request: Request, call_next):
-    request_id = str(uuid.uuid4())[:8]
+    request_id = uuid.uuid4().hex[:12]
     request.state.request_id = request_id
     response: Response = await call_next(request)
     response.headers["X-Request-Id"] = request_id
@@ -102,16 +118,10 @@ async def global_exception_handler(request: Request, exc: Exception):
     logger.exception("Unhandled error [%s] %s %s", request_id, request.method, request.url.path)
     return JSONResponse(
         status_code=500,
-        content={
-            "error": "internal_server_error",
-            "detail": "Internal server error",
-            "request_id": request_id,
-        },
+        content={"error": "internal_server_error", "detail": "Internal server error", "request_id": request_id},
     )
 
 
-# v1 API — all routes under /api/v1/
-# Also mount at /api/ for backward compatibility during migration
 V1_PREFIX = "/api/v1"
 COMPAT_PREFIX = "/api"
 
@@ -125,6 +135,7 @@ for prefix in (V1_PREFIX, COMPAT_PREFIX):
     app.include_router(broker_connect.router, prefix=prefix)
     app.include_router(reports.router, prefix=prefix)
     app.include_router(market_data.router, prefix=prefix)
+    app.include_router(admin.router, prefix=prefix)
 
 
 @app.get("/api/health")
@@ -139,9 +150,8 @@ async def health(request: Request):
     except Exception:
         pass
 
-    status = "ok" if db_ok else "degraded"
     return {
-        "status": status,
+        "status": "ok" if db_ok else "degraded",
         "service": "tradeloop",
         "version": APP_VERSION,
         "api_version": API_VERSION,

@@ -29,7 +29,10 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(128), nullable=False)
     name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     plan: Mapped[str] = mapped_column(String(20), default="free")
+    role: Mapped[str] = mapped_column(String(20), default="user")
     timezone_offset: Mapped[int] = mapped_column(default=0)
+    failed_login_count: Mapped[int] = mapped_column(default=0)
+    locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime(), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(), default=_utcnow, onupdate=_utcnow)
 
