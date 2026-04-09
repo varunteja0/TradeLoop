@@ -21,8 +21,13 @@ def _tz(user: User, tz: int = None) -> int:
 async def full_analytics(
     tz: int = Query(None), db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user),
 ):
+    from dataclasses import asdict
     trades = await trade_service.get_user_trades(db, user, limit=10000)
-    return await analytics_service.get_full_analytics(trades, user, _tz(user, tz))
+    tz_val = _tz(user, tz)
+
+    from app.engine.analytics import TradeAnalytics
+    result = TradeAnalytics().compute_all(trades, tz_offset_hours=tz_val)
+    return asdict(result)
 
 
 @router.get("/overview")
