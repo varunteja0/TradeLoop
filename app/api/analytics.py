@@ -26,8 +26,24 @@ async def full_analytics(
     tz_val = _tz(user, tz)
 
     from app.engine.analytics import TradeAnalytics
-    result = TradeAnalytics().compute_all(trades, tz_offset_hours=tz_val)
-    return asdict(result)
+    ta = TradeAnalytics()
+    overview = ta.overall_metrics(trades, tz_offset_hours=tz_val)
+    time_analysis = ta.time_analysis(trades, tz_offset_hours=tz_val)
+    behavioral = ta.behavioral_analysis(trades)
+    symbols = ta.symbol_analysis(trades)
+    streaks = ta.streak_analysis(trades)
+    equity_curve = ta.equity_curve_data(trades, tz_offset_hours=tz_val)
+    risk_metrics = ta.risk_metrics(trades, tz_offset_hours=tz_val)
+
+    return {
+        "overview": overview,
+        "time_analysis": time_analysis,
+        "behavioral": behavioral,
+        "symbols": symbols,
+        "streaks": streaks,
+        "equity_curve": equity_curve,
+        "risk_metrics": risk_metrics,
+    }
 
 
 @router.get("/overview")
