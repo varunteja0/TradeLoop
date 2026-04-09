@@ -138,6 +138,7 @@ for prefix in (V1_PREFIX, COMPAT_PREFIX):
 @app.get("/api/health")
 @app.get("/api/v1/health")
 async def health(request: Request):
+    import sys
     from sqlalchemy import text as sa_text
     db_ok = False
     try:
@@ -152,6 +153,45 @@ async def health(request: Request):
         "service": "tradeloop",
         "version": APP_VERSION,
         "api_version": API_VERSION,
+        "python": sys.version.split()[0],
         "database": "connected" if db_ok else "error",
         "request_id": getattr(request.state, "request_id", None),
     }
+
+
+@app.get("/api/v1/debug/analytics")
+async def debug_analytics(request: Request):
+    """Temporary diagnostic endpoint — remove after debugging."""
+    from app.db import get_db
+    from app.engine.analytics import TradeAnalytics
+    from app.models.trade import Trade
+    from sqlalchemy import select, func
+    from dataclasses import asdict
+
+    async for db in get_db():
+        count_result = await db.execute(select(func.count()).select_from(Trade))
+        total = count_result.scalar() or 0
+
+        result = await db.execute(select(Trade).limit(100))
+        trades = list(result.scalars().all())
+
+        ta = TradeAnalytics()
+        try:
+            full = ta.compute_all(trades)
+            data = asdict(full)
+            overview_keys = list(data.get("overview", {}).keys())
+            success = True
+            error_msg = None
+        except Exception as e:
+            overview_keys = []
+            success = False
+            error_msg = str(e)
+
+        return {
+            "total_trades_in_db": total,
+            "trades_fetched": len(trades),
+            "compute_success": success,
+            "error": error_msg,
+            "overview_keys": overview_keys[:5],
+            "overview_total_trades": data.get("overview", {}).get("total_trades") if success else None,
+        }
