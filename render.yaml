@@ -4,6 +4,7 @@ services:
     runtime: python
     region: oregon
     plan: free
+    pythonVersion: "3.11.0"
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
@@ -16,7 +17,7 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: FRONTEND_URL
-        value: https://tradeloop-web.onrender.com
+        value: https://frontend-ad2mjxxa9-varunteja0s-projects.vercel.app
     healthCheckPath: /api/health
 
 databases:
