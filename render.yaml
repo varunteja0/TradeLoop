@@ -17,7 +17,7 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: FRONTEND_URL
-        value: https://frontend-ad2mjxxa9-varunteja0s-projects.vercel.app
+        value: https://frontend-teal-one-zrjaf4su3x.vercel.app
     healthCheckPath: /api/health
 
 databases:
