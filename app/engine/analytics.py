@@ -45,26 +45,15 @@ class TradeAnalytics:
         if not trades:
             return FullAnalytics()
 
-        import logging
-        _log = logging.getLogger("tradeloop.analytics")
-
         sorted_trades = sorted(trades, key=lambda t: t.timestamp)
-
-        def _safe(name: str, fn):
-            try:
-                return fn()
-            except Exception:
-                _log.exception("Analytics section '%s' failed", name)
-                return {}
-
         return FullAnalytics(
-            overview=_safe("overview", lambda: self.overall_metrics(sorted_trades, tz_offset_hours=tz_offset_hours)),
-            time_analysis=_safe("time_analysis", lambda: self.time_analysis(sorted_trades, tz_offset_hours=tz_offset_hours)),
-            behavioral=_safe("behavioral", lambda: self.behavioral_analysis(sorted_trades)),
-            symbols=_safe("symbols", lambda: self.symbol_analysis(sorted_trades)),
-            streaks=_safe("streaks", lambda: self.streak_analysis(sorted_trades)),
-            equity_curve=_safe("equity_curve", lambda: self.equity_curve_data(sorted_trades, tz_offset_hours=tz_offset_hours)),
-            risk_metrics=_safe("risk_metrics", lambda: self.risk_metrics(sorted_trades, tz_offset_hours=tz_offset_hours)),
+            overview=self.overall_metrics(sorted_trades, tz_offset_hours=tz_offset_hours),
+            time_analysis=self.time_analysis(sorted_trades, tz_offset_hours=tz_offset_hours),
+            behavioral=self.behavioral_analysis(sorted_trades),
+            symbols=self.symbol_analysis(sorted_trades),
+            streaks=self.streak_analysis(sorted_trades),
+            equity_curve=self.equity_curve_data(sorted_trades, tz_offset_hours=tz_offset_hours),
+            risk_metrics=self.risk_metrics(sorted_trades, tz_offset_hours=tz_offset_hours),
         )
 
     # =====================================================================

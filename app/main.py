@@ -202,19 +202,22 @@ async def debug_analytics(request: Request):
                 svc_err = None
                 svc_trades_count = len(user_trades)
                 svc_overview = svc_data.get("overview", {}).get("total_trades")
+                svc_overview_keys = list(svc_data.get("overview", {}).keys())[:5]
             else:
                 svc_ok = False
                 svc_err = "no user found"
                 svc_trades_count = 0
                 svc_overview = None
-        except Exception as e:
+                svc_overview_keys = []
+        except Exception:
             svc_ok = False
-            svc_err = traceback.format_exc()
+            svc_err = traceback.format_exc()[-500:]
             svc_trades_count = 0
             svc_overview = None
+            svc_overview_keys = []
 
         return {
             "total_in_db": total,
             "direct": {"ok": direct_ok, "trades": direct_trades, "error": direct_err},
-            "service": {"ok": svc_ok, "user_trades": svc_trades_count, "overview_total": svc_overview, "error": svc_err},
+            "service": {"ok": svc_ok, "user_trades": svc_trades_count, "overview_total": svc_overview, "overview_keys": svc_overview_keys, "error": svc_err},
         }
