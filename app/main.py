@@ -22,7 +22,7 @@ logger = logging.getLogger("tradeloop")
 
 settings = get_settings()
 API_VERSION = "1"
-APP_VERSION = "7.0.0"
+APP_VERSION = "7.1.0"
 
 sentry_dsn = getattr(settings, "sentry_dsn", "")
 if sentry_dsn:

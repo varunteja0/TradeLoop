@@ -87,8 +87,12 @@ class AnalyticsService:
             )
 
         t0 = time.time()
-        result = self._analytics.compute_all(trades, tz_offset_hours=tz_offset)
-        data = asdict(result)
+        try:
+            result = self._analytics.compute_all(trades, tz_offset_hours=tz_offset)
+            data = asdict(result)
+        except Exception:
+            logger.exception("compute_all FAILED for user %s (%d trades)", user.email, len(trades))
+            data = asdict(self._analytics.__class__().compute_all([]))
         elapsed = round((time.time() - t0) * 1000, 1)
         logger.info("Full analytics computed for %s (%d trades, %sms)", user.email, len(trades), elapsed)
 
