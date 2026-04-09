@@ -12,7 +12,7 @@ import statistics
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Dict, List, Optional
 
 from app.models.trade import Trade
 
@@ -41,19 +41,30 @@ DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
 class TradeAnalytics:
     """Deterministic trade analytics engine. Pure math on trade data."""
 
-    def compute_all(self, trades: list[Trade], tz_offset_hours: int = 0) -> FullAnalytics:
+    def compute_all(self, trades: List[Trade], tz_offset_hours: int = 0) -> FullAnalytics:
         if not trades:
             return FullAnalytics()
 
+        import logging
+        _log = logging.getLogger("tradeloop.analytics")
+
         sorted_trades = sorted(trades, key=lambda t: t.timestamp)
+
+        def _safe(name: str, fn):
+            try:
+                return fn()
+            except Exception:
+                _log.exception("Analytics section '%s' failed", name)
+                return {}
+
         return FullAnalytics(
-            overview=self.overall_metrics(sorted_trades, tz_offset_hours=tz_offset_hours),
-            time_analysis=self.time_analysis(sorted_trades, tz_offset_hours=tz_offset_hours),
-            behavioral=self.behavioral_analysis(sorted_trades),
-            symbols=self.symbol_analysis(sorted_trades),
-            streaks=self.streak_analysis(sorted_trades),
-            equity_curve=self.equity_curve_data(sorted_trades, tz_offset_hours=tz_offset_hours),
-            risk_metrics=self.risk_metrics(sorted_trades, tz_offset_hours=tz_offset_hours),
+            overview=_safe("overview", lambda: self.overall_metrics(sorted_trades, tz_offset_hours=tz_offset_hours)),
+            time_analysis=_safe("time_analysis", lambda: self.time_analysis(sorted_trades, tz_offset_hours=tz_offset_hours)),
+            behavioral=_safe("behavioral", lambda: self.behavioral_analysis(sorted_trades)),
+            symbols=_safe("symbols", lambda: self.symbol_analysis(sorted_trades)),
+            streaks=_safe("streaks", lambda: self.streak_analysis(sorted_trades)),
+            equity_curve=_safe("equity_curve", lambda: self.equity_curve_data(sorted_trades, tz_offset_hours=tz_offset_hours)),
+            risk_metrics=_safe("risk_metrics", lambda: self.risk_metrics(sorted_trades, tz_offset_hours=tz_offset_hours)),
         )
 
     # =====================================================================
@@ -75,7 +86,7 @@ class TradeAnalytics:
     # =====================================================================
     # PERFORMANCE METRICS
     # =====================================================================
-    def overall_metrics(self, trades: list[Trade], tz_offset_hours: int = 0) -> dict:
+    def overall_metrics(self, trades: List[Trade], tz_offset_hours: int = 0) -> dict:
         total = len(trades)
         if total == 0:
             return {}
@@ -128,7 +139,7 @@ class TradeAnalytics:
     # =====================================================================
     # TIME ANALYSIS
     # =====================================================================
-    def time_analysis(self, trades: list[Trade], tz_offset_hours: int = 0) -> dict:
+    def time_analysis(self, trades: List[Trade], tz_offset_hours: int = 0) -> dict:
         if not trades:
             return {}
 
@@ -206,7 +217,7 @@ class TradeAnalytics:
     # =====================================================================
     # SYMBOL / INSTRUMENT ANALYSIS
     # =====================================================================
-    def symbol_analysis(self, trades: list[Trade]) -> dict:
+    def symbol_analysis(self, trades: List[Trade]) -> dict:
         if not trades:
             return {}
 
@@ -252,7 +263,7 @@ class TradeAnalytics:
     # =====================================================================
     # STREAK ANALYSIS
     # =====================================================================
-    def streak_analysis(self, trades: list[Trade]) -> dict:
+    def streak_analysis(self, trades: List[Trade]) -> dict:
         if not trades:
             return {}
 
@@ -306,7 +317,7 @@ class TradeAnalytics:
     # =====================================================================
     # EQUITY CURVE
     # =====================================================================
-    def equity_curve_data(self, trades: list[Trade], tz_offset_hours: int = 0) -> dict:
+    def equity_curve_data(self, trades: List[Trade], tz_offset_hours: int = 0) -> dict:
         if not trades:
             return {}
 
@@ -377,7 +388,7 @@ class TradeAnalytics:
     # =====================================================================
     # RISK METRICS
     # =====================================================================
-    def risk_metrics(self, trades: list[Trade], tz_offset_hours: int = 0) -> dict:
+    def risk_metrics(self, trades: List[Trade], tz_offset_hours: int = 0) -> dict:
         if not trades:
             return {}
 
@@ -502,6 +513,6 @@ class TradeAnalytics:
     # =====================================================================
     # BEHAVIORAL ANALYSIS (delegated to behavioral.py)
     # =====================================================================
-    def behavioral_analysis(self, trades: list[Trade]) -> dict:
+    def behavioral_analysis(self, trades: List[Trade]) -> dict:
         from app.engine.behavioral import BehavioralAnalyzer
         return BehavioralAnalyzer().analyze(trades)

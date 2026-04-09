@@ -11,13 +11,14 @@ from __future__ import annotations
 import statistics
 from collections import defaultdict
 from datetime import timedelta
+from typing import Dict, List, Set
 
 from app.models.trade import Trade
 
 
 class BehavioralAnalyzer:
 
-    def analyze(self, trades: list[Trade], tz_offset_hours: float = 0) -> dict:
+    def analyze(self, trades: List[Trade], tz_offset_hours: float = 0) -> dict:
         if len(trades) < 5:
             return {"insufficient_data": True, "min_trades_needed": 5}
 
@@ -35,10 +36,10 @@ class BehavioralAnalyzer:
             "time_between_trades": self._time_between_trades(trades),
         }
 
-    def _revenge_trades(self, trades: list[Trade]) -> dict:
+    def _revenge_trades(self, trades: List[Trade]) -> dict:
         """Trades taken within 5 minutes of a losing trade."""
         revenge = []
-        revenge_indices: set[int] = set()
+        revenge_indices: Set[int] = set()
         for i in range(1, len(trades)):
             prev = trades[i - 1]
             curr = trades[i]
@@ -76,10 +77,10 @@ class BehavioralAnalyzer:
             ) if len(revenge) >= 3 else None,
         }
 
-    def _overtrading_days(self, trades: list[Trade], tz_offset_hours: float = 0) -> dict:
+    def _overtrading_days(self, trades: List[Trade], tz_offset_hours: float = 0) -> dict:
         """Days with more than 2x the average daily trade count."""
         offset = timedelta(hours=tz_offset_hours)
-        daily_counts: dict[str, list[Trade]] = defaultdict(list)
+        daily_counts: Dict[str, List[Trade]] = defaultdict(list)
         for t in trades:
             day_key = (t.timestamp + offset).date().isoformat()
             daily_counts[day_key].append(t)
@@ -114,7 +115,7 @@ class BehavioralAnalyzer:
             ) if overtrading else None,
         }
 
-    def _tilt_detection(self, trades: list[Trade]) -> dict:
+    def _tilt_detection(self, trades: List[Trade]) -> dict:
         """Did position size increase after consecutive losses?"""
         tilt_events = []
         consec_losses = 0
@@ -149,9 +150,9 @@ class BehavioralAnalyzer:
             ) if len(tilt_events) >= 2 else None,
         }
 
-    def _streak_behavior(self, trades: list[Trade], streak_type: str, min_streak: int = 3) -> dict:
+    def _streak_behavior(self, trades: List[Trade], streak_type: str, min_streak: int = 3) -> dict:
         """What happens after N+ consecutive wins or losses?"""
-        next_trades_after_streak: list[Trade] = []
+        next_trades_after_streak: List[Trade] = []
         consec = 0
         target_positive = streak_type == "win"
 
@@ -184,7 +185,7 @@ class BehavioralAnalyzer:
 
     def _day_effect(
         self,
-        trades: list[Trade],
+        trades: List[Trade],
         target_day: int,
         label: str,
         tz_offset_hours: float = 0,
@@ -222,19 +223,19 @@ class BehavioralAnalyzer:
 
     def _position_in_day(
         self,
-        trades: list[Trade],
+        trades: List[Trade],
         position: str,
         tz_offset_hours: float = 0,
     ) -> dict:
         """Win rate of first or last trade of the day vs the rest."""
         offset = timedelta(hours=tz_offset_hours)
-        daily: dict[str, list[Trade]] = defaultdict(list)
+        daily: Dict[str, List[Trade]] = defaultdict(list)
         for t in trades:
             day_key = (t.timestamp + offset).date().isoformat()
             daily[day_key].append(t)
 
-        target_trades: list[Trade] = []
-        rest_trades: list[Trade] = []
+        target_trades: List[Trade] = []
+        rest_trades: List[Trade] = []
         multi_trade_days = 0
 
         for date, day_trades in daily.items():
@@ -271,7 +272,7 @@ class BehavioralAnalyzer:
             ) if abs(target_wr - rest_wr) > 10 else None,
         }
 
-    def _sizing_after_outcome(self, trades: list[Trade]) -> dict:
+    def _sizing_after_outcome(self, trades: List[Trade]) -> dict:
         """Average position size after a win vs after a loss."""
         size_after_win = []
         size_after_loss = []
@@ -300,7 +301,7 @@ class BehavioralAnalyzer:
             ) if abs(ratio - 1) > 0.15 else None,
         }
 
-    def _time_between_trades(self, trades: list[Trade]) -> dict:
+    def _time_between_trades(self, trades: List[Trade]) -> dict:
         """Does shorter time between trades correlate with worse performance?"""
         if len(trades) < 10:
             return {"has_data": False}
