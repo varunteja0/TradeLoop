@@ -118,15 +118,15 @@ export default function Landing() {
             <Link to="/register" className="btn-primary text-lg px-8 py-4 w-full sm:w-auto">
               Upload Your First Trades Free
             </Link>
-            <a href="#features" className="btn-secondary text-lg px-8 py-4 w-full sm:w-auto">
-              See How It Works
-            </a>
+            <Link to="/demo" className="btn-secondary text-lg px-8 py-4 w-full sm:w-auto">
+              Try Live Demo
+            </Link>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 max-w-lg mx-auto mt-16">
             {[
             ["50+", "Metrics computed"],
-            ["8", "Leak detectors with $ cost"],
+            ["8", "Leak detectors with ₹ cost"],
             ["5", "Prop firm presets"],
             ].map(([val, label]) => (
               <div key={label}>
@@ -218,7 +218,7 @@ export default function Landing() {
           <div className="grid md:grid-cols-2 gap-6">
             <div className="card border-accent/20 p-6">
               <div className="text-accent text-sm font-semibold uppercase tracking-wider mb-2">Counterfactual Insights</div>
-              <h3 className="text-xl font-bold text-white mb-2">"Revenge trading cost you $47,230"</h3>
+              <h3 className="text-xl font-bold text-white mb-2">"Revenge trading cost you ₹47,230"</h3>
               <p className="text-gray-400 text-sm">Every behavioral pattern comes with the exact dollar impact, a what-if equity curve, and a specific recommendation. Not vague advice — math.</p>
             </div>
             <div className="card border-accent/20 p-6">
@@ -265,7 +265,7 @@ export default function Landing() {
           <div className="grid md:grid-cols-3 gap-6">
             <div className="card p-6 text-center">
               <div className="text-sm text-gray-500 uppercase mb-2">Free</div>
-              <div className="text-3xl font-bold text-white mb-1">$0</div>
+              <div className="text-3xl font-bold text-white mb-1">₹0</div>
               <div className="text-sm text-gray-500 mb-6">50 trades/month</div>
               <ul className="text-sm text-gray-400 space-y-2 text-left mb-6">
                 <li>CSV upload</li>
@@ -277,7 +277,7 @@ export default function Landing() {
             <div className="card p-6 text-center border-accent/40 relative">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-accent text-bg-primary text-xs font-bold px-3 py-1 rounded-full">POPULAR</div>
               <div className="text-sm text-accent uppercase mb-2">Pro</div>
-              <div className="text-3xl font-bold text-white mb-1">$12<span className="text-lg text-gray-500">/mo</span></div>
+              <div className="text-3xl font-bold text-white mb-1">₹999<span className="text-lg text-gray-500">/mo</span></div>
               <div className="text-sm text-gray-500 mb-6">Unlimited trades</div>
               <ul className="text-sm text-gray-400 space-y-2 text-left mb-6">
                 <li>Everything in Free</li>
@@ -290,7 +290,7 @@ export default function Landing() {
             </div>
             <div className="card p-6 text-center">
               <div className="text-sm text-gray-500 uppercase mb-2">Prop Trader</div>
-              <div className="text-3xl font-bold text-white mb-1">$18<span className="text-lg text-gray-500">/mo</span></div>
+              <div className="text-3xl font-bold text-white mb-1">₹1,499<span className="text-lg text-gray-500">/mo</span></div>
               <div className="text-sm text-gray-500 mb-6">Multi-account</div>
               <ul className="text-sm text-gray-400 space-y-2 text-left mb-6">
                 <li>Everything in Pro</li>

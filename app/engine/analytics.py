@@ -494,8 +494,8 @@ class TradeAnalytics:
             "total_trades": len(trades),
             "tag_rate": round(len(tagged) / len(trades) * 100, 1) if trades else 0,
             "insight": (
-                f"You perform best when '{best_mood[0]}' (avg ${best_mood[1]['avg_pnl']}/trade) "
-                f"and worst when '{worst_mood[0]}' (avg ${worst_mood[1]['avg_pnl']}/trade)."
+                f"You perform best when '{best_mood[0]}' (avg ₹{best_mood[1]['avg_pnl']}/trade) "
+                f"and worst when '{worst_mood[0]}' (avg ₹{worst_mood[1]['avg_pnl']}/trade)."
             ) if len(result) >= 2 else "Tag more trades to see patterns.",
         }
 

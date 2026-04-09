@@ -38,6 +38,8 @@ export default function Settings() {
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [deleteAccountConfirm, setDeleteAccountConfirm] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
     document.title = "Settings — TradeLoop";
@@ -279,6 +281,47 @@ export default function Settings() {
                   Delete All Trades
                 </button>
               )}
+
+              <div className="border-t border-border mt-4 pt-4">
+                <p className="text-sm text-gray-400 mb-3">
+                  Permanently delete your account, all trades, and all personal data. This is irreversible.
+                </p>
+                {deleteAccountConfirm ? (
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={async () => {
+                        setDeletingAccount(true);
+                        try {
+                          await api.delete("/auth/account");
+                          toast("Account deleted. Goodbye.", "success");
+                          logout();
+                        } catch {
+                          toast("Failed to delete account", "error");
+                        } finally {
+                          setDeletingAccount(false);
+                        }
+                      }}
+                      className="px-4 py-2 rounded-lg text-sm font-medium bg-loss text-white hover:bg-loss/80 transition-colors"
+                      disabled={deletingAccount}
+                    >
+                      {deletingAccount ? "Deleting account..." : "Yes, Delete My Account"}
+                    </button>
+                    <button
+                      onClick={() => setDeleteAccountConfirm(false)}
+                      className="text-sm text-gray-400 hover:text-white transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setDeleteAccountConfirm(true)}
+                    className="px-4 py-2 rounded-lg text-sm font-medium border border-loss/30 text-loss hover:bg-loss/10 transition-colors"
+                  >
+                    Delete My Account
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </section>

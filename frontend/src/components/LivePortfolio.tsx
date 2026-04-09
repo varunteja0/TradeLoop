@@ -64,7 +64,7 @@ function LivePortfolioInner() {
       <div className="flex items-center justify-between pt-3 border-t border-border">
         <span className="text-xs text-gray-500">Total Unrealized P&L</span>
         <span className={`text-lg font-bold font-mono ${totalPnl >= 0 ? "text-win" : "text-loss"}`}>
-          {totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(2)}
+          {totalPnl >= 0 ? "+" : ""}₹{totalPnl.toFixed(2)}
         </span>
       </div>
 

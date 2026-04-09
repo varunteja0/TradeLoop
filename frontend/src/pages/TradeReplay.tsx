@@ -111,7 +111,7 @@ export default function TradeReplay() {
           data.trade.side === "BUY"
             ? ("arrowUp" as const)
             : ("arrowDown" as const),
-        text: `${data.trade.side} @ $${data.trade.entry_price}`,
+        text: `${data.trade.side} @ ₹${data.trade.entry_price}`,
       },
       {
         time: data.trade.exit_time as Time,
@@ -124,7 +124,7 @@ export default function TradeReplay() {
           data.trade.side === "BUY"
             ? ("arrowDown" as const)
             : ("arrowUp" as const),
-        text: `EXIT @ $${data.trade.exit_price} (${data.trade.pnl >= 0 ? "+" : ""}$${data.trade.pnl})`,
+        text: `EXIT @ ₹${data.trade.exit_price} (${data.trade.pnl >= 0 ? "+" : ""}₹${data.trade.pnl})`,
       },
     ].sort((a, b) => (a.time as number) - (b.time as number));
 
@@ -226,7 +226,7 @@ export default function TradeReplay() {
               <span
                 className={`text-sm font-mono font-bold ${isWin ? "text-win" : "text-loss"}`}
               >
-                {isWin ? "+" : ""}${t.pnl.toFixed(2)}
+                {isWin ? "+" : ""}₹{t.pnl.toFixed(2)}
               </span>
             </div>
 
@@ -243,7 +243,7 @@ export default function TradeReplay() {
                   </h3>
                 </div>
                 <p className="text-2xl font-bold font-mono text-win">
-                  ${data.mfe.dollar_value.toFixed(2)}
+                  ₹{data.mfe.dollar_value.toFixed(2)}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
                   {data.mfe.description}
@@ -258,7 +258,7 @@ export default function TradeReplay() {
                   </h3>
                 </div>
                 <p className="text-2xl font-bold font-mono text-loss">
-                  ${data.mae.dollar_value.toFixed(2)}
+                  ₹{data.mae.dollar_value.toFixed(2)}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
                   {data.mae.description}
@@ -273,7 +273,7 @@ export default function TradeReplay() {
                   </h3>
                 </div>
                 <p className="text-2xl font-bold font-mono text-accent">
-                  ${data.post_exit.money_left_on_table.toFixed(2)}
+                  ₹{data.post_exit.money_left_on_table.toFixed(2)}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
                   {data.post_exit.description}
@@ -288,11 +288,11 @@ export default function TradeReplay() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                 <div>
                   <span className="text-gray-500">Entry</span>
-                  <p className="font-mono text-white">${t.entry_price}</p>
+                  <p className="font-mono text-white">₹{t.entry_price}</p>
                 </div>
                 <div>
                   <span className="text-gray-500">Exit</span>
-                  <p className="font-mono text-white">${t.exit_price}</p>
+                  <p className="font-mono text-white">₹{t.exit_price}</p>
                 </div>
                 <div>
                   <span className="text-gray-500">Quantity</span>
@@ -303,7 +303,7 @@ export default function TradeReplay() {
                   <p
                     className={`font-mono font-bold ${isWin ? "text-win" : "text-loss"}`}
                   >
-                    {isWin ? "+" : ""}${t.pnl.toFixed(2)}
+                    {isWin ? "+" : ""}₹{t.pnl.toFixed(2)}
                   </p>
                 </div>
               </div>

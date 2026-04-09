@@ -72,7 +72,7 @@ class BehavioralAnalyzer:
             "alert": (
                 f"You revenge traded {len(revenge)} times ({round(len(revenge)/len(trades)*100, 1)}% of trades). "
                 f"Win rate on revenge trades: {wr}% vs {round(non_revenge_wr, 2)}% normally. "
-                f"Total P&L from revenge trades: ${round(total_pnl, 2)}."
+                f"Total P&L from revenge trades: ₹{round(total_pnl, 2)}."
             ) if len(revenge) >= 3 else None,
         }
 
@@ -110,7 +110,7 @@ class BehavioralAnalyzer:
             "total_pnl_on_overtrading_days": round(total_pnl_overtrading, 2),
             "alert": (
                 f"You overtraded on {len(overtrading)} days (>{round(threshold, 0):.0f} trades/day). "
-                f"Total P&L on those days: ${round(total_pnl_overtrading, 2)}."
+                f"Total P&L on those days: ₹{round(total_pnl_overtrading, 2)}."
             ) if overtrading else None,
         }
 
@@ -145,7 +145,7 @@ class BehavioralAnalyzer:
             "total_pnl_from_tilt": round(sum(outcomes), 2) if outcomes else 0,
             "alert": (
                 f"Detected {len(tilt_events)} tilt events where you sized up after consecutive losses. "
-                f"Average outcome: ${round(statistics.mean(outcomes), 2)}."
+                f"Average outcome: ₹{round(statistics.mean(outcomes), 2)}."
             ) if len(tilt_events) >= 2 else None,
         }
 
@@ -216,7 +216,7 @@ class BehavioralAnalyzer:
             "alert": (
                 f"{label}s are {'worse' if diff < 0 else 'better'} than other days: "
                 f"{round(target_wr, 1)}% win rate vs {round(other_wr, 1)}%. "
-                f"Total {label} P&L: ${round(target_pnl, 2)}."
+                f"Total {label} P&L: ₹{round(target_pnl, 2)}."
             ) if significant else None,
         }
 
@@ -267,7 +267,7 @@ class BehavioralAnalyzer:
             "difference": round(target_wr - rest_wr, 2),
             "alert": (
                 f"Your {position} trade of the day has a {round(target_wr, 1)}% win rate "
-                f"vs {round(rest_wr, 1)}% for other trades. Avg P&L: ${round(target_avg_pnl, 2)}."
+                f"vs {round(rest_wr, 1)}% for other trades. Avg P&L: ₹{round(target_avg_pnl, 2)}."
             ) if abs(target_wr - rest_wr) > 10 else None,
         }
 
@@ -341,6 +341,6 @@ class BehavioralAnalyzer:
             "alert": (
                 f"Quick trades (< {round(avg_gap, 0):.0f} min gap) have a {round(fast_wr, 1)}% win rate "
                 f"vs {round(slow_wr, 1)}% for patient trades. "
-                f"Avg P&L: ${round(fast_avg_pnl, 2)} vs ${round(slow_avg_pnl, 2)}."
+                f"Avg P&L: ₹{round(fast_avg_pnl, 2)} vs ₹{round(slow_avg_pnl, 2)}."
             ) if abs(fast_wr - slow_wr) > 8 else None,
         }

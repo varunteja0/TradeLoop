@@ -66,9 +66,9 @@ const GRADE_COLORS: Record<string, string> = {
 
 function formatDollar(v: number): string {
   const abs = Math.abs(v).toFixed(2);
-  if (v > 0) return `+$${abs}`;
-  if (v < 0) return `-$${abs}`;
-  return `$${abs}`;
+  if (v > 0) return `+₹${abs}`;
+  if (v < 0) return `-₹${abs}`;
+  return `₹${abs}`;
 }
 
 function ChangeIndicator({ value, suffix = "" }: { value: number; suffix?: string }) {

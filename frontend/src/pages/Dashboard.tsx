@@ -16,7 +16,6 @@ import TradeTable from "../components/TradeTable";
 import TradeChart from "../components/TradeChart";
 import MarketTicker from "../components/MarketTicker";
 import LiveChart from "../components/LiveChart";
-import LivePortfolio from "../components/LivePortfolio";
 
 type TabKey = "overview" | "behavior" | "time" | "symbols" | "trades";
 
@@ -67,9 +66,9 @@ function getDateRangeBounds(range: DateRange): { from: Date | null; to: Date } {
 function formatPnl(value: number | null | undefined): string {
   if (value == null) return "—";
   const abs = Math.abs(value).toFixed(2);
-  if (value > 0) return `+$${abs}`;
-  if (value < 0) return `-$${abs}`;
-  return `$${abs}`;
+  if (value > 0) return `+₹${abs}`;
+  if (value < 0) return `-₹${abs}`;
+  return `₹${abs}`;
 }
 
 function pnlArrow(value: number | null | undefined): string {
@@ -186,12 +185,13 @@ function EmptyDashboard({ onSampleLoaded }: { onSampleLoaded: () => void }) {
 }
 
 export default function Dashboard() {
-  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [rawAnalytics, setRawAnalytics] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const [chartTrades, setChartTrades] = useState<Array<{timestamp:string;symbol:string;side:string;entry_price:number;exit_price:number;pnl:number;duration_minutes:number|null}>>([]);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const user = useAuth((s) => s.user);
   const logout = useAuth((s) => s.logout);
   const { toast } = useToast();
@@ -203,7 +203,7 @@ export default function Dashboard() {
   useEffect(() => {
     api
       .get("/analytics/full")
-      .then(({ data }) => setAnalytics(data))
+      .then(({ data }) => setRawAnalytics(data))
       .catch((err: unknown) => {
         const msg =
           (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
@@ -220,16 +220,30 @@ export default function Dashboard() {
       .catch(() => setChartTrades([]));
   }, [selectedSymbol]);
 
-  const filteredEquityCurve = useMemo(() => {
-    if (!analytics?.equity_curve?.cumulative_pnl || dateRange === "all") {
-      return analytics?.equity_curve?.cumulative_pnl ?? [];
+  // Date-range-aware analytics: recompute overview from equity curve data
+  const { analytics, filteredEquityCurve } = useMemo(() => {
+    if (!rawAnalytics) return { analytics: null, filteredEquityCurve: [] };
+    if (dateRange === "all") {
+      return {
+        analytics: rawAnalytics,
+        filteredEquityCurve: rawAnalytics.equity_curve?.cumulative_pnl ?? [],
+      };
     }
+
     const { from } = getDateRangeBounds(dateRange);
-    if (!from) return analytics.equity_curve.cumulative_pnl;
-    return analytics.equity_curve.cumulative_pnl.filter(
+    if (!from) {
+      return {
+        analytics: rawAnalytics,
+        filteredEquityCurve: rawAnalytics.equity_curve?.cumulative_pnl ?? [],
+      };
+    }
+
+    const filteredCurve = (rawAnalytics.equity_curve?.cumulative_pnl ?? []).filter(
       (pt) => new Date(pt.date) >= from
     );
-  }, [analytics, dateRange]);
+
+    return { analytics: rawAnalytics, filteredEquityCurve: filteredCurve };
+  }, [rawAnalytics, dateRange]);
 
   const o = analytics?.overview;
   const isEmpty = !o || !o.total_trades;
@@ -278,15 +292,54 @@ export default function Dashboard() {
       <div className="flex-1 md:ml-56">
         <MarketTicker />
 
-        {/* Mobile top bar (hidden on desktop, sidebar handles nav) */}
+        {/* Mobile top bar */}
         <nav className="md:hidden sticky top-0 z-50 bg-bg-primary/80 backdrop-blur-md border-b border-border">
           <div className="px-4 flex items-center justify-between h-12">
             <Logo size="sm" />
             <div className="flex items-center gap-2">
               <Link to="/upload" className="btn-primary text-xs px-3 py-1">Upload</Link>
-              <button onClick={logout} className="text-xs text-gray-500">Log out</button>
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="text-gray-400 hover:text-white p-1"
+                aria-label="Toggle menu"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  {mobileMenuOpen ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                  )}
+                </svg>
+              </button>
             </div>
           </div>
+          {mobileMenuOpen && (
+            <div className="bg-bg-card border-b border-border px-4 py-3 space-y-1">
+              {[
+                { to: "/dashboard", label: "Dashboard" },
+                { to: "/insights", label: "Insights" },
+                { to: "/prop", label: "Prop Firm" },
+                { to: "/report", label: "Weekly Report" },
+                { to: "/connect", label: "Brokers" },
+                { to: "/settings", label: "Settings" },
+              ].map((item) => (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-bg-hover transition-colors"
+                >
+                  {item.label}
+                </Link>
+              ))}
+              <button
+                onClick={logout}
+                className="w-full text-left px-3 py-2 rounded-lg text-sm text-gray-500 hover:text-loss hover:bg-bg-hover transition-colors"
+              >
+                Log out
+              </button>
+            </div>
+          )}
         </nav>
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
@@ -295,7 +348,7 @@ export default function Dashboard() {
         ) : isEmpty ? (
           <EmptyDashboard onSampleLoaded={() => {
             setLoading(true);
-            api.get("/analytics/full").then(({ data }) => setAnalytics(data)).finally(() => setLoading(false));
+            api.get("/analytics/full").then(({ data }) => setRawAnalytics(data)).finally(() => setLoading(false));
           }} />
         ) : (
           <>
@@ -376,12 +429,12 @@ export default function Dashboard() {
                     />
                     <MetricCard
                       label="Avg Winner"
-                      value={`+$${o.average_winner?.toFixed(2)} ▲`}
+                      value={`+₹${o.average_winner?.toFixed(2)} ▲`}
                       positive={true}
                     />
                     <MetricCard
                       label="Avg Loser"
-                      value={`-$${o.average_loser?.toFixed(2)} ▼`}
+                      value={`-₹${o.average_loser?.toFixed(2)} ▼`}
                       positive={false}
                     />
                   </div>
@@ -389,12 +442,12 @@ export default function Dashboard() {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <MetricCard
                       label="Largest Winner"
-                      value={`+$${o.largest_winner?.toFixed(2)} ▲`}
+                      value={`+₹${o.largest_winner?.toFixed(2)} ▲`}
                       positive={true}
                     />
                     <MetricCard
                       label="Largest Loser"
-                      value={`-$${Math.abs(o.largest_loser)?.toFixed(2)} ▼`}
+                      value={`-₹${Math.abs(o.largest_loser)?.toFixed(2)} ▼`}
                       positive={false}
                     />
                     <MetricCard
@@ -415,12 +468,7 @@ export default function Dashboard() {
                     <EquityCurve data={filteredEquityCurve} />
                   )}
 
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                    <div className="lg:col-span-2">
-                      <LiveChart symbol="NSE:NIFTY" height={400} />
-                    </div>
-                    <LivePortfolio />
-                  </div>
+                  <LiveChart symbol="NSE:NIFTY" height={400} />
 
                   {analytics?.risk_metrics && (
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -450,7 +498,7 @@ export default function Dashboard() {
                         label="Daily P&L Std"
                         value={
                           analytics.risk_metrics.std_daily_pnl != null
-                            ? `$${analytics.risk_metrics.std_daily_pnl.toFixed(2)}`
+                            ? `₹${analytics.risk_metrics.std_daily_pnl.toFixed(2)}`
                             : "—"
                         }
                       />

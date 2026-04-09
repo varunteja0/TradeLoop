@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/client";
 import type { Trade } from "../types";
@@ -14,13 +14,24 @@ const sortableColumns: { key: SortKey; label: string; apiKey: string }[] = [
   { key: "pnl", label: "P&L", apiKey: "pnl" },
 ];
 
+function useDebouncedValue<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => {
+    timerRef.current = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timerRef.current);
+  }, [value, delay]);
+  return debounced;
+}
+
 export default function TradeTable() {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const search = useDebouncedValue(searchInput, 300);
   const [sortKey, setSortKey] = useState<SortKey>("timestamp");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [sideFilter, setSideFilter] = useState<SideFilter>("ALL");
@@ -132,8 +143,8 @@ export default function TradeTable() {
         <div className="flex flex-wrap items-center gap-2">
           <input
             type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search symbol…"
             aria-label="Search trades by symbol"
             className="px-3 py-1.5 text-sm rounded-lg bg-bg-hover border border-border text-white placeholder-gray-500 focus:outline-none focus:border-accent w-40"
@@ -319,8 +330,7 @@ export default function TradeTable() {
                       t.pnl >= 0 ? "text-win" : "text-loss"
                     }`}
                   >
-                    {t.pnl >= 0 ? "+" : ""}
-                    {t.pnl.toFixed(2)}
+                    {t.pnl >= 0 ? "+" : ""}₹{Math.abs(t.pnl).toFixed(2)}
                     <span className="ml-0.5" aria-hidden="true">
                       {t.pnl >= 0 ? "▲" : "▼"}
                     </span>

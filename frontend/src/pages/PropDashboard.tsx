@@ -149,15 +149,21 @@ export default function PropDashboard() {
         setAccounts(data);
         if (data.length > 0) setSelectedId(data[0].id);
       })
-      .catch(() => {})
+      .catch((err) => {
+        setError(err?.response?.data?.detail || "Failed to load prop accounts. Please try again.");
+      })
       .finally(() => setLoading(false));
   }, []);
 
   const loadCompliance = useCallback((id: string) => {
     setComplianceLoading(true);
+    setError("");
     api.get(`/prop/${id}/compliance`)
       .then(({ data }) => setCompliance(data))
-      .catch(() => setCompliance(null))
+      .catch((err) => {
+        setCompliance(null);
+        setError(err?.response?.data?.detail || "Failed to load compliance data.");
+      })
       .finally(() => setComplianceLoading(false));
   }, []);
 
@@ -233,7 +239,7 @@ export default function PropDashboard() {
                       className="text-sm bg-bg-card border border-border rounded-lg px-3 py-1.5 text-gray-300">
                       {accounts.map((a) => (
                         <option key={a.id} value={a.id}>
-                          {a.name} — ${a.initial_balance.toLocaleString()}
+                          {a.name} — ₹{a.initial_balance.toLocaleString()}
                         </option>
                       ))}
                     </select>
@@ -264,7 +270,7 @@ export default function PropDashboard() {
                     </select>
                   </div>
                   <div>
-                    <label htmlFor="prop-balance" className="block text-xs text-gray-400 mb-1">Initial Balance ($)</label>
+                    <label htmlFor="prop-balance" className="block text-xs text-gray-400 mb-1">Initial Balance (₹)</label>
                     <input id="prop-balance" type="number" step="0.01" min="0" value={formBalance}
                       onChange={(e) => setFormBalance(e.target.value)} placeholder="100000"
                       className="input-field text-sm" required />
@@ -299,7 +305,7 @@ export default function PropDashboard() {
                         <p className="text-xs text-gray-500 mb-1">Account Status</p>
                         <p className={`text-3xl font-bold font-mono ${statusStyle!.text}`}>{statusStyle!.label}</p>
                         <p className="text-xs text-gray-500 mt-2">
-                          {selectedAccount.name} &middot; Balance: ${compliance.current_balance.toLocaleString()}
+                          {selectedAccount.name} &middot; Balance: ₹{compliance.current_balance.toLocaleString()}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">{compliance.summary}</p>
                       </div>
@@ -313,16 +319,16 @@ export default function PropDashboard() {
                       <div className="card">
                         <p className="text-xs text-gray-500">Today's P&L</p>
                         <p className={`text-lg font-bold font-mono ${compliance.daily_pnl >= 0 ? "text-win" : "text-loss"}`}>
-                          {compliance.daily_pnl >= 0 ? "+" : ""}${compliance.daily_pnl.toFixed(2)}
+                          {compliance.daily_pnl >= 0 ? "+" : ""}₹{compliance.daily_pnl.toFixed(2)}
                         </p>
                       </div>
                       <div className="card">
                         <p className="text-xs text-gray-500">Daily Loss Left</p>
-                        <p className="text-lg font-bold font-mono text-white">${compliance.daily_loss_remaining.toFixed(2)}</p>
+                        <p className="text-lg font-bold font-mono text-white">₹{compliance.daily_loss_remaining.toFixed(2)}</p>
                       </div>
                       <div className="card">
                         <p className="text-xs text-gray-500">Drawdown Left</p>
-                        <p className="text-lg font-bold font-mono text-white">${compliance.max_drawdown_remaining.toFixed(2)}</p>
+                        <p className="text-lg font-bold font-mono text-white">₹{compliance.max_drawdown_remaining.toFixed(2)}</p>
                       </div>
                       <div className="card">
                         <p className="text-xs text-gray-500">Trading Days</p>

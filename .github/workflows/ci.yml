@@ -56,26 +56,20 @@ jobs:
       - name: Build
         run: npx vite build
 
-  deploy-staging:
-    name: Deploy to Staging
+  deploy:
+    name: Deploy
     needs: [backend, frontend]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment: staging
     steps:
-      - uses: actions/checkout@v4
-      - name: Deploy to staging
-        run: echo "Deploy to staging environment via Railway/Render"
+      - name: Deploy Backend (Render)
+        if: env.RENDER_DEPLOY_HOOK_URL != ''
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: curl -s "$RENDER_DEPLOY_HOOK_URL"
 
-  deploy-production:
-    name: Deploy to Production
-    needs: [deploy-staging]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment:
-      name: production
-      url: https://tradeloop.io
-    steps:
-      - uses: actions/checkout@v4
-      - name: Deploy to production
-        run: echo "Deploy to production — requires approval in GitHub environment settings"
+      - name: Deploy Frontend (Vercel)
+        if: env.VERCEL_DEPLOY_HOOK_URL != ''
+        env:
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: curl -s -X POST "$VERCEL_DEPLOY_HOOK_URL"

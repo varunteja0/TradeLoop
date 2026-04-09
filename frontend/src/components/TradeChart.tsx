@@ -83,7 +83,7 @@ function TradeChartInner({ trades, symbol, height = 400 }: Props) {
         position: trade.side === "BUY" ? "belowBar" : "aboveBar",
         color: trade.pnl >= 0 ? "#00d4aa" : "#ff4757",
         shape: trade.side === "BUY" ? "arrowUp" : "arrowDown",
-        text: `${trade.side} ${trade.pnl >= 0 ? "+" : ""}$${trade.pnl.toFixed(0)}`,
+        text: `${trade.side} ${trade.pnl >= 0 ? "+" : ""}₹${trade.pnl.toFixed(0)}`,
       });
     }
 
@@ -136,9 +136,14 @@ function TradeChartInner({ trades, symbol, height = 400 }: Props) {
   return (
     <div className="card">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-300">
-          Trade Chart — <span className="text-white font-mono">{symbol}</span>
-        </h3>
+        <div>
+          <h3 className="text-sm font-semibold text-gray-300">
+            Entry/Exit Map — <span className="text-white font-mono">{symbol}</span>
+          </h3>
+          <p className="text-[10px] text-gray-500 mt-0.5">
+            Visualizes your trade entries and exits. Not live market candles.
+          </p>
+        </div>
         <span className="text-xs text-gray-500">{tradeCount} trades</span>
       </div>
       <div

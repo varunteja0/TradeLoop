@@ -21,7 +21,7 @@ const EquityCurve = React.memo(function EquityCurve({ data, loading }: Props) {
     const first = data[0];
     const last = data[data.length - 1];
     const direction = last.cumulative_pnl >= first.cumulative_pnl ? "up" : "down";
-    return `Equity curve from ${first.date} to ${last.date}, trending ${direction}. Final cumulative P&L: $${last.cumulative_pnl.toFixed(2)} across ${last.trade_count} trades.`;
+    return `Equity curve from ${first.date} to ${last.date}, trending ${direction}. Final cumulative P&L: ₹${last.cumulative_pnl.toFixed(2)} across ${last.trade_count} trades.`;
   }, [data]);
 
   if (loading) {
@@ -71,7 +71,7 @@ const EquityCurve = React.memo(function EquityCurve({ data, loading }: Props) {
               tick={{ fill: "#6b7280", fontSize: 11 }}
               tickLine={false}
               axisLine={{ stroke: "#1e1e2e" }}
-              tickFormatter={(v: number) => `$${v}`}
+              tickFormatter={(v: number) => `₹${v}`}
             />
             <Tooltip
               contentStyle={{
@@ -82,7 +82,7 @@ const EquityCurve = React.memo(function EquityCurve({ data, loading }: Props) {
               }}
               labelStyle={{ color: "#9ca3af" }}
               formatter={(value: number) => [
-                `$${value.toFixed(2)}`,
+                `₹${value.toFixed(2)}`,
                 "Cumulative P&L",
               ]}
             />

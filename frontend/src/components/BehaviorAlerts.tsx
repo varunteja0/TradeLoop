@@ -73,7 +73,7 @@ const BehaviorAlerts = React.memo(function BehaviorAlerts({ data }: Props) {
     ) {
       result.push({
         type: "info",
-        text: `After 3+ win streaks (${data.win_streak_behavior.occurrences} times), your next trade wins ${data.win_streak_behavior.next_trade_win_rate}% of the time with avg P&L $${data.win_streak_behavior.next_trade_avg_pnl}.`,
+        text: `After 3+ win streaks (${data.win_streak_behavior.occurrences} times), your next trade wins ${data.win_streak_behavior.next_trade_win_rate}% of the time with avg P&L ₹${data.win_streak_behavior.next_trade_avg_pnl}.`,
       });
     }
 
@@ -83,7 +83,7 @@ const BehaviorAlerts = React.memo(function BehaviorAlerts({ data }: Props) {
     ) {
       result.push({
         type: "warning",
-        text: `After 3+ loss streaks (${data.loss_streak_behavior.occurrences} times), your next trade wins ${data.loss_streak_behavior.next_trade_win_rate}% of the time with avg P&L $${data.loss_streak_behavior.next_trade_avg_pnl}.`,
+        text: `After 3+ loss streaks (${data.loss_streak_behavior.occurrences} times), your next trade wins ${data.loss_streak_behavior.next_trade_win_rate}% of the time with avg P&L ₹${data.loss_streak_behavior.next_trade_avg_pnl}.`,
       });
     }
 

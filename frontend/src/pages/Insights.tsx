@@ -53,13 +53,13 @@ const SEVERITY_STYLES: Record<string, { bg: string; text: string; label: string 
 };
 
 function formatDollar(value: number): string {
-  const abs = Math.abs(value).toLocaleString("en-US", {
+  const abs = Math.abs(value).toLocaleString("en-IN", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-  if (value > 0) return `+$${abs}`;
-  if (value < 0) return `-$${abs}`;
-  return `$${abs}`;
+  if (value > 0) return `+₹${abs}`;
+  if (value < 0) return `-₹${abs}`;
+  return `₹${abs}`;
 }
 
 function SkeletonCard() {
@@ -192,7 +192,7 @@ function InsightCard({
                       tick={{ fontSize: 10, fill: "#6b7280" }}
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(v: number) => `$${v}`}
+                      tickFormatter={(v: number) => `₹${v}`}
                     />
                     <Tooltip
                       contentStyle={{
@@ -202,7 +202,7 @@ function InsightCard({
                         fontSize: "12px",
                       }}
                       formatter={(value: number, name: string) => [
-                        `$${value.toFixed(2)}`,
+                        `₹${value.toFixed(2)}`,
                         name === "actual" ? "Actual" : "Without This Pattern",
                       ]}
                     />
@@ -325,7 +325,7 @@ export default function Insights() {
               <h1 className="text-xl sm:text-2xl font-bold text-white mb-3">
                 You left{" "}
                 <span className="text-red-400 font-mono">
-                  ${Math.abs(gap).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  ₹{Math.abs(gap).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                 </span>{" "}
                 on the table. Here&rsquo;s exactly where.
               </h1>

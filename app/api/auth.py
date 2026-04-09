@@ -191,6 +191,24 @@ async def reset_password(token: str = Body(...), new_password: str = Body(...), 
     return {"message": "Password reset successfully"}
 
 
+@router.delete("/account", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_account(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Permanently delete a user account and all associated data."""
+    from sqlalchemy import delete as sql_delete
+    from app.models.trade import Trade
+    from app.models.audit_log import AuditLog as AuditLogModel
+
+    await db.execute(sql_delete(Trade).where(Trade.user_id == user.id))
+    await db.execute(sql_delete(AuditLogModel).where(AuditLogModel.user_id == user.id))
+    await db.delete(user)
+    await db.flush()
+    logger.info("Account deleted: %s", user.email)
+
+
 @router.get("/audit-log")
 async def audit_log(
     db: AsyncSession = Depends(get_db),

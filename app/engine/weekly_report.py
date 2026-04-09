@@ -182,7 +182,7 @@ class WeeklyReportEngine:
         pnl_word = "profit" if tw["total_pnl"] >= 0 else "loss"
         return (
             f"This week: {tw['total_trades']} trades, "
-            f"${abs(tw['total_pnl'])} {pnl_word}, "
+            f"₹{abs(tw['total_pnl'])} {pnl_word}, "
             f"{tw['win_rate']}% win rate. "
             f"Grade: {grade}. "
             f"Focus for next week: {focus['area']}."

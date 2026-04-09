@@ -1,7 +1,7 @@
 """
 Counterfactual Analysis Engine — TradeLoop's differentiator.
 
-Not "you revenge traded 12 times" but "revenge trading cost you exactly $47,230.
+Not "you revenge traded 12 times" but "revenge trading cost you exactly ₹47,230.
 Here is your equity curve with and without those trades."
 
 Every insight has: pattern name, dollar impact, confidence, what-if curve, recommendation.
@@ -122,7 +122,7 @@ class CounterfactualEngine:
             description=(
                 f"You took {len(revenge_indices)} revenge trades (within 5 min of a loss). "
                 f"Win rate: {round(revenge_wr, 1)}% vs {round(normal_wr, 1)}% normally. "
-                f"Net impact: ${round(total_pnl, 2)}."
+                f"Net impact: ₹{round(total_pnl, 2)}."
             ),
             recommendation=(
                 "Set a mandatory 10-minute cooldown after any losing trade. "
@@ -181,7 +181,7 @@ class CounterfactualEngine:
             monthly_projection=round(abs(excess_pnl) / days, 2) if excess_pnl < 0 else 0,
             description=(
                 f"On high-volume days (>{threshold} trades), the excess trades "
-                f"({len(excess_indices)} total) had a net P&L of ${round(excess_pnl, 2)}."
+                f"({len(excess_indices)} total) had a net P&L of ₹{round(excess_pnl, 2)}."
             ),
             recommendation=(
                 f"Cap yourself at {threshold} trades per day. Your excess trades are "
@@ -224,7 +224,7 @@ class CounterfactualEngine:
             monthly_projection=round(abs(tilt_pnl) / days, 2) if tilt_pnl < 0 else 0,
             description=(
                 f"You increased position size {len(tilt_indices)} times after consecutive losses. "
-                f"Net result: ${round(tilt_pnl, 2)}."
+                f"Net result: ₹{round(tilt_pnl, 2)}."
             ),
             recommendation=(
                 "Never increase size after losses. Keep position size constant or reduce it. "
@@ -276,7 +276,7 @@ class CounterfactualEngine:
             dollar_impact=round(bad_pnl, 2),
             monthly_projection=round(abs(bad_pnl) / days, 2) if bad_pnl < 0 else 0,
             description=(
-                f"Trading during {', '.join(hour_strs)} cost you ${abs(round(bad_pnl, 2))}. "
+                f"Trading during {', '.join(hour_strs)} cost you ₹{abs(round(bad_pnl, 2))}. "
                 f"Your profitable hours: {', '.join(good_strs)}."
             ),
             recommendation=(
@@ -322,7 +322,7 @@ class CounterfactualEngine:
             dollar_impact=round(bad_pnl, 2),
             monthly_projection=round(abs(bad_pnl) / days, 2),
             description=(
-                f"{day_names[worst_day]}s cost you ${abs(round(bad_pnl, 2))} across "
+                f"{day_names[worst_day]}s cost you ₹{abs(round(bad_pnl, 2))} across "
                 f"{dow_count[worst_day]} trades."
             ),
             recommendation=(
@@ -380,7 +380,7 @@ class CounterfactualEngine:
             monthly_projection=round(abs(last_pnl) / days, 2) if last_pnl < 0 else 0,
             description=(
                 f"Your last trade of the day has a {round(last_wr, 1)}% win rate vs "
-                f"{round(other_wr, 1)}% for others. Cost: ${abs(round(last_pnl, 2))}."
+                f"{round(other_wr, 1)}% for others. Cost: ₹{abs(round(last_pnl, 2))}."
             ),
             recommendation=(
                 "Stop trading 30 minutes before your planned end time. "
@@ -443,7 +443,7 @@ class CounterfactualEngine:
             monthly_projection=round(abs(oversized_pnl) / days, 2),
             description=(
                 f"{len(oversized_indices)} trades were >1.5x your average size AND lost money. "
-                f"Total damage: ${abs(round(oversized_pnl, 2))}."
+                f"Total damage: ₹{abs(round(oversized_pnl, 2))}."
             ),
             recommendation=(
                 f"Cap position size at {round(avg_qty * 1.2, 1)}. "

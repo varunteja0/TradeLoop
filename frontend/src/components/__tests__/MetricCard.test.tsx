@@ -9,13 +9,15 @@ describe("MetricCard", () => {
     expect(screen.getByText(/56%/)).toBeInTheDocument();
   });
 
-  it("shows positive indicator", () => {
-    render(<MetricCard label="P&L" value="$1000" positive={true} />);
-    expect(screen.getByText(/▲/)).toBeInTheDocument();
+  it("applies positive styling", () => {
+    render(<MetricCard label="P&L" value="+₹1,000 ▲" positive={true} />);
+    const el = screen.getByLabelText("P&L: +₹1,000 ▲");
+    expect(el.className).toContain("emerald");
   });
 
-  it("shows negative indicator", () => {
-    render(<MetricCard label="P&L" value="-$500" positive={false} />);
-    expect(screen.getByText(/▼/)).toBeInTheDocument();
+  it("applies negative styling", () => {
+    render(<MetricCard label="P&L" value="-₹500 ▼" positive={false} />);
+    const el = screen.getByLabelText("P&L: -₹500 ▼");
+    expect(el.className).toContain("red");
   });
 });

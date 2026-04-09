@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /upload
+Disallow: /connect
+
+Sitemap: https://tradeloop.io/sitemap.xml

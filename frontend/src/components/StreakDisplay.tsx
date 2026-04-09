@@ -70,8 +70,8 @@ const StreakDisplay = React.memo(function StreakDisplay({ data }: Props) {
                       ? "bg-win/15 text-win"
                       : "bg-loss/15 text-loss"
                   }`}
-                  title={`${streak.count} ${streak.type}s, P&L: $${streak.pnl}`}
-                  aria-label={`${streak.count} ${streak.type === "win" ? "win" : "loss"} streak, P&L $${streak.pnl.toFixed(2)}`}
+                  title={`${streak.count} ${streak.type}s, P&L: ₹${streak.pnl}`}
+                  aria-label={`${streak.count} ${streak.type === "win" ? "win" : "loss"} streak, P&L ₹${streak.pnl.toFixed(2)}`}
                 >
                   {streak.count}
                   {streakIsWin ? "W" : "L"}

@@ -171,6 +171,19 @@ export default function Upload() {
                 )}
               </div>
             </div>
+            {result.errors && result.errors.length > 0 && (
+              <div className="mb-4 bg-yellow-500/5 border border-yellow-500/20 rounded-lg p-3">
+                <p className="text-xs font-semibold text-yellow-400 mb-1">Import Warnings</p>
+                <ul className="text-xs text-yellow-400/80 space-y-0.5">
+                  {result.errors.slice(0, 5).map((err, i) => (
+                    <li key={i}>• {err}</li>
+                  ))}
+                  {result.errors.length > 5 && (
+                    <li className="text-yellow-500/60">...and {result.errors.length - 5} more</li>
+                  )}
+                </ul>
+              </div>
+            )}
             <button onClick={() => navigate("/dashboard")} className="btn-primary w-full">
               View Your Analytics
             </button>

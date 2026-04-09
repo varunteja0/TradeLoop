@@ -95,6 +95,9 @@ class TradeService:
         await db.flush()
         logger.info("User %s uploaded %d trades (skipped: %d)", user.email, imported, skipped)
 
+        if imported > 0:
+            await event_bus.emit("trade.uploaded", user_id=user.id, count=imported)
+
         return UploadResult(imported=imported, skipped=skipped, errors=errors[:5])
 
     async def list_trades(
@@ -155,10 +158,12 @@ class TradeService:
         if not trade:
             raise LookupError("Trade not found")
         await db.delete(trade)
+        await event_bus.emit("trade.deleted", user_id=user.id, trade_id=trade_id)
         logger.info("Trade %s deleted by user %s", trade_id, user.email)
 
     async def delete_all_trades(self, db: AsyncSession, user: User) -> None:
         await db.execute(delete(Trade).where(Trade.user_id == user.id))
+        await event_bus.emit("trade.deleted", user_id=user.id, trade_id="all")
         logger.warning("All trades deleted for user %s", user.email)
 
     async def export_csv(self, db: AsyncSession, user: User) -> str:

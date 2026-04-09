@@ -104,7 +104,7 @@ const SymbolTable = React.memo(function SymbolTable({ perSymbol, onSymbolClick, 
                 <span
                   className={`font-mono ${data.total_pnl >= 0 ? "text-win" : "text-loss"}`}
                 >
-                  {pnlPrefix(data.total_pnl)}${data.total_pnl.toFixed(2)}
+                  {pnlPrefix(data.total_pnl)}₹{data.total_pnl.toFixed(2)}
                   <span className="ml-1 text-xs" aria-hidden="true">
                     {pnlIndicator(data.total_pnl)}
                   </span>
@@ -114,7 +114,7 @@ const SymbolTable = React.memo(function SymbolTable({ perSymbol, onSymbolClick, 
                 <span
                   className={`font-mono ${data.avg_pnl >= 0 ? "text-win" : "text-loss"}`}
                 >
-                  {pnlPrefix(data.avg_pnl)}${data.avg_pnl.toFixed(2)}
+                  {pnlPrefix(data.avg_pnl)}₹{data.avg_pnl.toFixed(2)}
                   <span className="ml-1 text-xs" aria-hidden="true">
                     {pnlIndicator(data.avg_pnl)}
                   </span>

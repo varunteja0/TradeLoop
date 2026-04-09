@@ -76,6 +76,8 @@ async def create_order(
     amount = plan_info["price_inr"]
 
     if not settings.razorpay_key_id or not settings.razorpay_key_secret:
+        if settings.environment == "production":
+            raise HTTPException(status_code=503, detail="Payment gateway not configured. Contact support.")
         logger.warning("Razorpay keys not configured — returning mock order (dev mode)")
         return CreateOrderResponse(
             order_id="order_dev_mock_123",
@@ -128,6 +130,8 @@ async def verify_payment(
         raise HTTPException(status_code=400, detail=f"Invalid plan. Must be one of: {', '.join(sorted(PAID_PLANS))}")
 
     if not settings.razorpay_key_id or not settings.razorpay_key_secret:
+        if settings.environment == "production":
+            raise HTTPException(status_code=503, detail="Payment verification unavailable. Contact support.")
         logger.warning("Razorpay keys not configured — accepting payment in dev mode")
         user.plan = body.plan
         await db.commit()

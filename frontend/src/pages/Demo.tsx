@@ -65,7 +65,7 @@ const DEMO_DATA: Analytics = {
   },
   behavioral: {
     revenge_trades: {
-      alert: "12 revenge trades detected (5.6% of all trades). These trades have a 25% win rate and lost $1,240 total. Consider a 15-minute cooling-off period after losses.",
+      alert: "12 revenge trades detected (5.6% of all trades). These trades have a 25% win rate and lost ₹1,240 total. Consider a 15-minute cooling-off period after losses.",
       count: 12,
       win_rate: 25,
       total_pnl: -1240,
@@ -73,7 +73,7 @@ const DEMO_DATA: Analytics = {
       normal_win_rate: 59.8,
     },
     overtrading_days: {
-      alert: "8 overtrading days identified where you exceeded 8 trades/day. Net P&L on those days: -$620.",
+      alert: "8 overtrading days identified where you exceeded 8 trades/day. Net P&L on those days: -₹620.",
       count: 8,
       total_pnl_on_overtrading_days: -620,
     },
@@ -165,6 +165,13 @@ const DEMO_DATA: Analytics = {
 };
 
 function generateEquityCurve() {
+  // Seeded PRNG for deterministic demo data across renders
+  let seed = 42;
+  function seededRandom() {
+    seed = (seed * 16807 + 0) % 2147483647;
+    return (seed - 1) / 2147483646;
+  }
+
   const points = [];
   let pnl = 0;
   const start = new Date("2025-08-01");
@@ -172,12 +179,12 @@ function generateEquityCurve() {
     const date = new Date(start);
     date.setDate(date.getDate() + i);
     if (date.getDay() === 0 || date.getDay() === 6) continue;
-    const dailyPnl = (Math.random() - 0.38) * 300;
+    const dailyPnl = (seededRandom() - 0.38) * 300;
     pnl += dailyPnl;
     points.push({
       date: date.toISOString().split("T")[0],
       cumulative_pnl: Math.round(pnl * 100) / 100,
-      trade_count: Math.floor(Math.random() * 4) + 1,
+      trade_count: Math.floor(seededRandom() * 4) + 1,
     });
   }
   const finalTarget = 8550;
@@ -191,9 +198,9 @@ function generateEquityCurve() {
 function formatPnl(value: number | null | undefined): string {
   if (value == null) return "—";
   const abs = Math.abs(value).toFixed(2);
-  if (value > 0) return `+$${abs}`;
-  if (value < 0) return `-$${abs}`;
-  return `$${abs}`;
+  if (value > 0) return `+₹${abs}`;
+  if (value < 0) return `-₹${abs}`;
+  return `₹${abs}`;
 }
 
 function pnlArrow(value: number | null | undefined): string {
@@ -259,12 +266,12 @@ export default function Demo() {
           />
           <MetricCard
             label="Avg Winner"
-            value={`+$${o.average_winner.toFixed(2)} ▲`}
+            value={`+₹${o.average_winner.toFixed(2)} ▲`}
             positive={true}
           />
           <MetricCard
             label="Avg Loser"
-            value={`-$${o.average_loser.toFixed(2)} ▼`}
+            value={`-₹${o.average_loser.toFixed(2)} ▼`}
             positive={false}
           />
         </div>

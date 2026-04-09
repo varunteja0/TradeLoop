@@ -53,7 +53,7 @@ const TimeHeatmap = React.memo(function TimeHeatmap({
               <div
                 key={hour}
                 className={`rounded-lg p-2 text-center ${getColor(wr)}`}
-                aria-label={`Hour ${hour}: win rate ${wr}%, P&L $${pnl.toFixed(0)}`}
+                aria-label={`Hour ${hour}: win rate ${wr}%, P&L ₹${pnl.toFixed(0)}`}
               >
                 <div className="text-xs opacity-70">{hour}:00</div>
                 <div className="text-sm font-bold">
@@ -61,7 +61,7 @@ const TimeHeatmap = React.memo(function TimeHeatmap({
                   {wr}%
                 </div>
                 <div className="text-[10px] opacity-60">
-                  ${pnl.toFixed(0)}
+                  ₹{pnl.toFixed(0)}
                 </div>
               </div>
             );
@@ -80,7 +80,7 @@ const TimeHeatmap = React.memo(function TimeHeatmap({
               <div
                 key={day}
                 className={`rounded-lg p-3 text-center ${getColor(wr)}`}
-                aria-label={`${day}: win rate ${wr}%, P&L $${pnl.toFixed(0)}`}
+                aria-label={`${day}: win rate ${wr}%, P&L ₹${pnl.toFixed(0)}`}
               >
                 <div className="text-xs opacity-70">{day.slice(0, 3)}</div>
                 <div className="text-lg font-bold">
@@ -88,7 +88,7 @@ const TimeHeatmap = React.memo(function TimeHeatmap({
                   {wr}%
                 </div>
                 <div className="text-xs opacity-60">
-                  ${pnl.toFixed(0)}
+                  ₹{pnl.toFixed(0)}
                 </div>
               </div>
             );

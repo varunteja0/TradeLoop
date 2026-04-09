@@ -10,6 +10,7 @@ export default function Login() {
   const login = useAuth((s) => s.login);
   const loading = useAuth((s) => s.loading);
   const user = useAuth((s) => s.user);
+  const hydrated = useAuth((s) => s.hydrated);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -18,8 +19,8 @@ export default function Login() {
   }, []);
 
   useEffect(() => {
-    if (user) navigate("/dashboard", { replace: true });
-  }, [user, navigate]);
+    if (hydrated && user) navigate("/dashboard", { replace: true });
+  }, [hydrated, user, navigate]);
 
   useEffect(() => {
     if (searchParams.get("expired") === "true") {
@@ -40,6 +41,14 @@ export default function Login() {
       setError(msg);
     }
   };
+
+  if (!hydrated) {
+    return (
+      <div className="min-h-screen bg-bg-primary flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-bg-primary flex items-center justify-center px-4">

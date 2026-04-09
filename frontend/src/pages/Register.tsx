@@ -10,11 +10,17 @@ export default function Register() {
   const [error, setError] = useState("");
   const register = useAuth((s) => s.register);
   const loading = useAuth((s) => s.loading);
+  const user = useAuth((s) => s.user);
+  const hydrated = useAuth((s) => s.hydrated);
   const navigate = useNavigate();
 
   useEffect(() => {
     document.title = "Sign Up — TradeLoop";
   }, []);
+
+  useEffect(() => {
+    if (hydrated && user) navigate("/dashboard", { replace: true });
+  }, [hydrated, user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +40,14 @@ export default function Register() {
       setError(msg);
     }
   };
+
+  if (!hydrated) {
+    return (
+      <div className="min-h-screen bg-bg-primary flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-bg-primary flex items-center justify-center px-4">

@@ -433,20 +433,20 @@ class PropComplianceEngine:
         if usage_pct >= 100:
             return "VIOLATED: Daily loss limit breached."
         if usage_pct >= 90:
-            return f"CRITICAL: Only ${remaining:.2f} daily loss remaining."
+            return f"CRITICAL: Only ₹{remaining:.2f} daily loss remaining."
         if usage_pct >= 70:
-            return f"WARNING: ${remaining:.2f} daily loss remaining."
-        return f"${remaining:.2f} daily loss remaining."
+            return f"WARNING: ₹{remaining:.2f} daily loss remaining."
+        return f"₹{remaining:.2f} daily loss remaining."
 
     @staticmethod
     def _drawdown_message(usage_pct: float, remaining: float) -> str:
         if usage_pct >= 100:
             return "VIOLATED: Maximum drawdown breached."
         if usage_pct >= 90:
-            return f"CRITICAL: Only ${remaining:.2f} drawdown remaining."
+            return f"CRITICAL: Only ₹{remaining:.2f} drawdown remaining."
         if usage_pct >= 70:
-            return f"WARNING: ${remaining:.2f} drawdown remaining."
-        return f"${remaining:.2f} drawdown buffer remaining."
+            return f"WARNING: ₹{remaining:.2f} drawdown remaining."
+        return f"₹{remaining:.2f} drawdown buffer remaining."
 
     @staticmethod
     def _compute_risk_score(rules: List[RuleStatus]) -> int:

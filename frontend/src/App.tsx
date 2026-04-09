@@ -24,7 +24,13 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const user = useAuth((s) => s.user);
   const hydrated = useAuth((s) => s.hydrated);
-  if (!hydrated) return null;
+  if (!hydrated) {
+    return (
+      <div className="min-h-screen bg-bg-primary flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
   if (!user) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
