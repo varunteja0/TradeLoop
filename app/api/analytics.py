@@ -17,7 +17,7 @@ def _tz(user: User, tz: int = None) -> int:
     return tz if tz is not None else user.timezone_offset
 
 
-@router.get("/full", response_model=AnalyticsResponse)
+@router.get("/full")
 async def full_analytics(
     tz: int = Query(None), db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user),
 ):
