@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 logger = logging.getLogger("tradeloop.market_data")
 
@@ -96,7 +96,7 @@ class MarketDataService:
         import httpx
 
         url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
-        params: dict[str, str | int] = {
+        params: Dict[str, Union[str, int]] = {
             "period1": period1,
             "period2": period2,
             "interval": interval,
