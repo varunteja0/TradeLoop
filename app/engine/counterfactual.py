@@ -304,7 +304,7 @@ class CounterfactualEngine:
             dow_indices[d].append(i)
             dow_count[d] += 1
 
-        worst_day = min(dow_pnl, key=dow_pnl.get)  # type: ignore[arg-type]
+        worst_day = min(dow_pnl, key=lambda k: dow_pnl[k])
         if dow_pnl[worst_day] >= 0 or dow_count[worst_day] < 5:
             return None
 
