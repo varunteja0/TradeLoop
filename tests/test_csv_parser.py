@@ -124,3 +124,41 @@ class TestEmptyCsv:
         csv_content = "date,symbol,side,entry_price,exit_price,quantity,pnl\n"
         trades, errors = parse_csv(csv_content, broker="generic")
         assert trades == []
+
+
+# =====================================================================
+# Flexible / headerless / delimiter sniffing
+# =====================================================================
+class TestFlexibleImports:
+
+    def test_headerless_broker_row_comma(self):
+        """MT-style row with symbol, side, open date/time, prices, explicit PnL."""
+        csv_content = (
+            "USOIL,Sell,4/9/2026,20:52,101.8,4/9/2026,20:56,102.051,100.88,102.048,0.2,$0.00"
+        )
+        trades, errors = parse_csv(csv_content, broker="generic")
+        assert len(errors) == 0
+        assert len(trades) == 1
+        assert trades[0].symbol == "USOIL"
+        assert trades[0].side == "SELL"
+        assert trades[0].pnl == 0.0
+        assert trades[0].duration_minutes is not None
+
+    def test_tab_separated_same_row(self):
+        csv_content = (
+            "USOIL\tSell\t4/9/2026\t20:52\t101.8\t4/9/2026\t20:56\t102.051\t0.2\t$0.00"
+        )
+        trades, errors = parse_csv(csv_content, broker="generic")
+        assert len(errors) == 0
+        assert len(trades) == 1
+        assert trades[0].symbol == "USOIL"
+
+    def test_utf8_bom_generic(self):
+        csv_content = (
+            "\ufeffdate,symbol,side,entry_price,exit_price,quantity,pnl\n"
+            "2024-06-10 09:00:00,AAPL,BUY,150.0,155.0,10,50.0\n"
+        )
+        trades, errors = parse_csv(csv_content, broker="generic")
+        assert len(errors) == 0
+        assert len(trades) == 1
+        assert trades[0].symbol == "AAPL"
