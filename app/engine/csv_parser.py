@@ -59,19 +59,31 @@ def _detect_format(content: str) -> BrokerFormat:
 
 def _parse_generic(content: str) -> Tuple[List[TradeCreate], List[str]]:
     """
-    Expected columns (flexible naming):
-    date/timestamp, symbol, side/direction, entry_price, exit_price, quantity/size, pnl/profit
-    Optional: duration, setup, notes, fees
+    Flexible parser: tries header matching first, then scans data to find
+    date/symbol/pnl columns automatically. Works with most trader CSV exports.
     """
     reader = csv.DictReader(io.StringIO(content))
     if reader.fieldnames is None:
-        return [], []
+        return [], ["Could not read CSV headers. Make sure the file has a header row."]
 
-    col_map = _build_column_map(reader.fieldnames)
+    all_rows = list(reader)
+    if not all_rows:
+        return [], ["CSV has headers but no data rows."]
+
+    col_map = _build_column_map_smart(reader.fieldnames, all_rows)
+
+    if "timestamp" not in col_map:
+        detected = ", ".join(reader.fieldnames[:8])
+        return [], [
+            f"Could not find a date/timestamp column. "
+            f"Your columns: [{detected}]. "
+            f"Rename your date column to 'date' or 'timestamp' and re-upload."
+        ]
+
     trades: List[TradeCreate] = []
     errors: List[str] = []
 
-    for row_num, row in enumerate(reader, start=2):
+    for row_num, row in enumerate(all_rows, start=2):
         try:
             raw_ts = row.get(col_map.get("timestamp", ""), "")
             ts = _parse_timestamp(raw_ts)
@@ -86,8 +98,12 @@ def _parse_generic(content: str) -> Tuple[List[TradeCreate], List[str]]:
             exit_p = _parse_float(row.get(col_map.get("exit_price", ""), "0"))
             qty = _parse_float(row.get(col_map.get("quantity", ""), "1"))
             side = row.get(col_map.get("side", ""), "BUY").strip().upper()
-            if side not in ("BUY", "SELL"):
+            if side not in ("BUY", "SELL", "LONG", "SHORT"):
                 side = "BUY"
+            if side == "LONG":
+                side = "BUY"
+            if side == "SHORT":
+                side = "SELL"
 
             symbol = row.get(col_map.get("symbol", ""), "UNKNOWN").strip().upper()
 
@@ -282,17 +298,45 @@ def _parse_mt4(content: str) -> Tuple[List[TradeCreate], List[str]]:
 # ========================= HELPERS =========================
 
 COLUMN_ALIASES: Dict[str, List[str]] = {
-    "timestamp": ["date", "timestamp", "time", "datetime", "trade_date", "open_time", "entry_time"],
-    "symbol": ["symbol", "ticker", "instrument", "tradingsymbol", "pair", "asset"],
-    "side": ["side", "direction", "type", "trade_type", "action", "buy_sell"],
-    "entry_price": ["entry_price", "entry", "open_price", "buy_price", "price_in"],
-    "exit_price": ["exit_price", "exit", "close_price", "sell_price", "price_out"],
-    "quantity": ["quantity", "qty", "size", "volume", "lots", "shares"],
-    "pnl": ["pnl", "profit", "profit_loss", "p&l", "pl", "net_pnl", "realized_pnl"],
+    "timestamp": [
+        "date", "timestamp", "time", "datetime", "trade_date", "open_time",
+        "entry_time", "close_time", "exit_time", "open_date", "close_date",
+        "entry_date", "exit_date", "trade_time", "executed_at", "execution_time",
+        "created_at", "filled_at", "order_time", "order_date",
+    ],
+    "symbol": [
+        "symbol", "ticker", "instrument", "tradingsymbol", "pair", "asset",
+        "stock", "scrip", "name", "security", "contract", "market",
+        "trading_symbol", "script", "stock_name",
+    ],
+    "side": [
+        "side", "direction", "type", "trade_type", "action", "buy_sell",
+        "b/s", "bs", "order_type", "transaction_type", "buy/sell",
+    ],
+    "entry_price": [
+        "entry_price", "entry", "open_price", "buy_price", "price_in",
+        "avg_price", "average_price", "price", "fill_price", "executed_price",
+    ],
+    "exit_price": [
+        "exit_price", "exit", "close_price", "sell_price", "price_out",
+        "closing_price",
+    ],
+    "quantity": [
+        "quantity", "qty", "size", "volume", "lots", "shares",
+        "filled_qty", "traded_qty", "no_of_shares", "units",
+    ],
+    "pnl": [
+        "pnl", "profit", "profit_loss", "p&l", "pl", "net_pnl", "realized_pnl",
+        "realised_pnl", "gain", "gain_loss", "return", "net_profit",
+        "profit/loss", "p/l", "gross_pnl", "total_pnl", "amount",
+    ],
     "duration": ["duration", "duration_minutes", "hold_time", "holding_time"],
-    "setup": ["setup", "setup_type", "strategy", "pattern"],
-    "notes": ["notes", "comment", "comments", "remarks"],
-    "fees": ["fees", "commission", "brokerage", "charges"],
+    "setup": ["setup", "setup_type", "strategy", "pattern", "tag", "label"],
+    "notes": ["notes", "comment", "comments", "remarks", "description", "reason"],
+    "fees": [
+        "fees", "commission", "brokerage", "charges", "cost", "transaction_charges",
+        "stt", "total_charges",
+    ],
 }
 
 
@@ -305,6 +349,56 @@ def _build_column_map(headers: List[str]) -> Dict[str, str]:
         for alias in aliases:
             if alias in normalized:
                 mapping[field] = normalized[alias]
+                break
+
+    return mapping
+
+
+def _build_column_map_smart(
+    headers: List[str], sample_rows: List[Dict[str, str]]
+) -> Dict[str, str]:
+    """
+    Two-pass column mapping:
+    1. Try header-name matching (existing logic)
+    2. If timestamp column not found, scan sample data to find a column
+       that contains parseable dates
+    """
+    mapping = _build_column_map(headers)
+
+    if "timestamp" not in mapping and sample_rows:
+        for h in headers:
+            for row in sample_rows[:5]:
+                val = row.get(h, "").strip()
+                if val and _parse_timestamp(val) is not None:
+                    mapping["timestamp"] = h
+                    break
+            if "timestamp" in mapping:
+                break
+
+    if "pnl" not in mapping and sample_rows:
+        for h in headers:
+            if h in [mapping.get(k) for k in mapping]:
+                continue
+            money_count = 0
+            for row in sample_rows[:5]:
+                val = row.get(h, "").strip()
+                if val and ("$" in val or "₹" in val or re.match(r"^-?\d+\.?\d*$", val)):
+                    money_count += 1
+            if money_count >= 3:
+                mapping["pnl"] = h
+                break
+
+    if "symbol" not in mapping and sample_rows:
+        for h in headers:
+            if h in [mapping.get(k) for k in mapping]:
+                continue
+            alpha_count = 0
+            for row in sample_rows[:5]:
+                val = row.get(h, "").strip()
+                if val and re.match(r"^[A-Za-z]", val) and not _parse_timestamp(val):
+                    alpha_count += 1
+            if alpha_count >= 3:
+                mapping["symbol"] = h
                 break
 
     return mapping

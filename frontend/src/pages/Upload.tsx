@@ -191,13 +191,26 @@ export default function Upload() {
         )}
 
         <div className="mt-8 card">
-          <h3 className="text-sm font-semibold text-gray-300 mb-3">Expected CSV Format</h3>
-          <code className="text-xs text-gray-500 font-mono block overflow-x-auto">
-            date,symbol,side,entry_price,exit_price,quantity,pnl,duration,setup,notes,fees
-          </code>
-          <p className="text-xs text-gray-500 mt-3">
-            Or just export from your broker — we&apos;ll auto-detect Zerodha and MT4/MT5 formats.
-          </p>
+          <h3 className="text-sm font-semibold text-gray-300 mb-3">Supported Formats</h3>
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs text-accent font-semibold mb-1">Minimum required columns:</p>
+              <code className="text-xs text-gray-500 font-mono block overflow-x-auto bg-bg-primary rounded p-2">
+                date, symbol, pnl
+              </code>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 font-semibold mb-1">Full format (optional columns):</p>
+              <code className="text-xs text-gray-500 font-mono block overflow-x-auto bg-bg-primary rounded p-2">
+                date, symbol, side, entry_price, exit_price, quantity, pnl, fees, setup, notes
+              </code>
+            </div>
+            <div className="text-xs text-gray-500 space-y-1">
+              <p>Auto-detects: <span className="text-gray-400">Zerodha tradebook, Angel One, MT4/MT5, and any CSV with a date column</span></p>
+              <p>Column names are flexible — we recognize aliases like &quot;ticker&quot;, &quot;profit&quot;, &quot;timestamp&quot;, &quot;qty&quot;, etc.</p>
+              <p>Dates: ISO (2024-01-15), dd/mm/yyyy, mm/dd/yyyy all work.</p>
+            </div>
+          </div>
         </div>
       </main>
     </div>

@@ -119,10 +119,8 @@ class TestEmptyCsv:
     def test_empty_csv(self):
         trades, errors = parse_csv("", broker="generic")
         assert trades == []
-        assert errors == []
 
     def test_header_only_csv(self):
         csv_content = "date,symbol,side,entry_price,exit_price,quantity,pnl\n"
         trades, errors = parse_csv(csv_content, broker="generic")
         assert trades == []
-        assert errors == []
