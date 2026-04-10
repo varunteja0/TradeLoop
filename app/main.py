@@ -108,7 +108,7 @@ async def add_security_headers(request: Request, call_next):
 @app.middleware("http")
 async def add_request_metadata(request: Request, call_next):
     request_id = uuid.uuid4().hex[:12]
-    request.state.request_id = request_id
+    setattr(request.state, "request_id", request_id)
     response: Response = await call_next(request)
     response.headers["X-Request-Id"] = request_id
     response.headers["X-API-Version"] = API_VERSION
