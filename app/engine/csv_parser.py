@@ -60,11 +60,30 @@ def _detect_format(content: str) -> BrokerFormat:
 def _parse_generic(content: str) -> Tuple[List[TradeCreate], List[str]]:
     """
     Flexible parser: tries header matching first, then scans data to find
-    date/symbol/pnl columns automatically. Works with most trader CSV exports.
+    date/symbol/pnl columns automatically. If no header row is detected,
+    assigns positional column names and parses by data inspection.
     """
     reader = csv.DictReader(io.StringIO(content))
     if reader.fieldnames is None:
         return [], ["Could not read CSV headers. Make sure the file has a header row."]
+
+    # Detect if the "header" row is actually data (no recognized column names
+    # AND first "header" value looks like a date or a ticker symbol)
+    header_map = _build_column_map(reader.fieldnames)
+    first_fields = [f.strip() for f in reader.fieldnames]
+    header_looks_like_data = (
+        len(header_map) <= 1
+        and len(first_fields) >= 3
+        and (
+            _parse_timestamp(first_fields[0]) is not None
+            or _parse_timestamp(" ".join(first_fields[:2])) is not None
+            or any(_parse_timestamp(f) is not None for f in first_fields)
+            or re.match(r"^[A-Z]{2,}[A-Z0-9]*$", first_fields[0])
+        )
+    )
+
+    if header_looks_like_data:
+        return _parse_headerless(content)
 
     all_rows = list(reader)
     if not all_rows:
@@ -295,6 +314,132 @@ def _parse_mt4(content: str) -> Tuple[List[TradeCreate], List[str]]:
     return trades, errors
 
 
+def _parse_headerless(content: str) -> Tuple[List[TradeCreate], List[str]]:
+    """
+    Parse a CSV that has no header row. Detects column roles by scanning values:
+    - Date columns: contain parseable timestamps
+    - Symbol column: uppercase letters (NIFTY, USOIL, AAPL)
+    - Side column: contains BUY/SELL/LONG/SHORT
+    - Numeric columns: prices, PnL, quantity
+    """
+    rows = list(csv.reader(io.StringIO(content)))
+    if not rows:
+        return [], ["Empty CSV file."]
+
+    num_cols = len(rows[0])
+    if num_cols < 3:
+        return [], ["CSV has fewer than 3 columns. Need at least symbol, date, and pnl."]
+
+    # Classify each column by scanning all rows
+    date_cols: List[int] = []
+    time_only_cols: List[int] = []
+    symbol_col: Optional[int] = None
+    side_col: Optional[int] = None
+    numeric_cols: List[int] = []
+
+    for col_idx in range(num_cols):
+        sample_vals = [r[col_idx].strip() for r in rows[:10] if col_idx < len(r)]
+
+        date_count = sum(1 for v in sample_vals if _parse_timestamp(v) is not None)
+        time_only_count = sum(1 for v in sample_vals if re.match(r"^\d{1,2}:\d{2}(:\d{2})?$", v))
+        side_count = sum(1 for v in sample_vals if v.upper() in ("BUY", "SELL", "LONG", "SHORT"))
+        alpha_count = sum(1 for v in sample_vals if re.match(r"^[A-Z][A-Z0-9]{1,20}$", v.upper()) and v.upper() not in ("BUY", "SELL", "LONG", "SHORT"))
+        num_count = sum(1 for v in sample_vals if re.match(r"^[\-\+\$₹]?[\d,.]+$", v.replace(" ", "")))
+
+        if date_count >= len(sample_vals) * 0.5:
+            date_cols.append(col_idx)
+        elif time_only_count >= len(sample_vals) * 0.5:
+            time_only_cols.append(col_idx)
+        elif side_count >= len(sample_vals) * 0.5:
+            side_col = col_idx
+        elif alpha_count >= len(sample_vals) * 0.5 and symbol_col is None:
+            symbol_col = col_idx
+        elif num_count >= len(sample_vals) * 0.5:
+            numeric_cols.append(col_idx)
+
+    # Try merging date + adjacent time-only columns (e.g., "4/9/2026" + "20:52")
+    merged_date_pairs: List[Tuple[int, int]] = []
+    for dc in date_cols:
+        for tc in time_only_cols:
+            if tc == dc + 1:
+                test_merged = rows[0][dc].strip() + " " + rows[0][tc].strip()
+                if _parse_timestamp(test_merged) is not None:
+                    merged_date_pairs.append((dc, tc))
+                    break
+
+    if not date_cols and not merged_date_pairs:
+        col_preview = ", ".join(rows[0][:10])
+        return [], [f"No date column detected in headerless CSV. First row: [{col_preview}]"]
+
+    trades: List[TradeCreate] = []
+    errors: List[str] = []
+
+    for row_num, row in enumerate(rows, start=1):
+        if len(row) < 3:
+            continue
+        try:
+            # Parse timestamp
+            ts = None
+            if merged_date_pairs:
+                a, b = merged_date_pairs[0]
+                ts = _parse_timestamp(row[a].strip() + " " + row[b].strip())
+            if ts is None and date_cols:
+                ts = _parse_timestamp(row[date_cols[0]].strip())
+            if ts is None:
+                for ci in range(num_cols):
+                    ts = _parse_timestamp(row[ci].strip())
+                    if ts is not None:
+                        break
+            if ts is None:
+                errors.append(f"Row {row_num}: no parseable date found")
+                continue
+
+            symbol = row[symbol_col].strip().upper() if symbol_col is not None and symbol_col < len(row) else "UNKNOWN"
+
+            side = "BUY"
+            if side_col is not None and side_col < len(row):
+                s = row[side_col].strip().upper()
+                if s in ("SELL", "SHORT"):
+                    side = "SELL"
+
+            # Assign numeric columns: first two are entry/exit prices
+            nums = [(_parse_float(row[ci]), ci) for ci in numeric_cols if ci < len(row)]
+            num_vals = [n[0] for n in nums]
+
+            entry_price = num_vals[0] if len(num_vals) >= 1 else 0.0
+            exit_price = num_vals[1] if len(num_vals) >= 2 else 0.0
+            quantity = 1.0
+            pnl = 0.0
+
+            # Calculate PnL from entry/exit + direction
+            if entry_price > 0 and exit_price > 0:
+                if side == "BUY":
+                    pnl = round((exit_price - entry_price) * quantity, 2)
+                else:
+                    pnl = round((entry_price - exit_price) * quantity, 2)
+            elif len(num_vals) == 1:
+                pnl = num_vals[0]
+
+            trades.append(TradeCreate(
+                timestamp=ts,
+                symbol=symbol,
+                side=side,
+                entry_price=entry_price,
+                exit_price=exit_price,
+                quantity=quantity,
+                pnl=round(pnl, 2),
+                duration_minutes=None,
+                setup_type=None,
+                notes=None,
+                fees=0.0,
+            ))
+        except Exception as exc:
+            errors.append(f"Row {row_num}: {exc}")
+            continue
+
+    return trades, errors
+
+
 # ========================= HELPERS =========================
 
 COLUMN_ALIASES: Dict[str, List[str]] = {
@@ -421,11 +566,13 @@ _TIMESTAMP_FORMATS: List[str] = [
     # Unambiguous day-first with dashes
     "%d-%m-%Y %H:%M:%S",
     "%d-%m-%Y",
-    # Ambiguous slash-separated — dd/mm before mm/dd (Indian market preference)
-    "%d/%m/%Y %H:%M:%S",
-    "%d/%m/%Y",
+    # Ambiguous slash-separated — mm/dd first (broker exports typically use this)
     "%m/%d/%Y %H:%M:%S",
+    "%m/%d/%Y %H:%M",
     "%m/%d/%Y",
+    "%d/%m/%Y %H:%M:%S",
+    "%d/%m/%Y %H:%M",
+    "%d/%m/%Y",
 ]
 
 
