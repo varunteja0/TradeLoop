@@ -12,7 +12,7 @@ import statistics
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import DefaultDict, Dict, List, Optional
+from typing import Any, DefaultDict, Dict, List, Optional
 
 from app.models.trade import Trade
 
@@ -330,7 +330,7 @@ class TradeAnalytics:
         # Drawdown
         peak = 0.0
         min_during_dd = 0.0
-        drawdown_periods = []
+        drawdown_periods: List[Dict[str, Any]] = []
         current_dd_start = None
 
         for point in cumulative:
