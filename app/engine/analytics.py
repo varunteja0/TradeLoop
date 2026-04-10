@@ -502,6 +502,6 @@ class TradeAnalytics:
     # =====================================================================
     # BEHAVIORAL ANALYSIS (delegated to behavioral.py)
     # =====================================================================
-    def behavioral_analysis(self, trades: List[Trade]) -> dict:
+    def behavioral_analysis(self, trades: List[Trade], tz_offset_hours: int = 0) -> dict:
         from app.engine.behavioral import BehavioralAnalyzer
-        return BehavioralAnalyzer().analyze(trades)
+        return BehavioralAnalyzer().analyze(trades, tz_offset_hours=tz_offset_hours)

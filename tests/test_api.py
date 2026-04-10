@@ -183,6 +183,18 @@ class TestAnalytics:
         for section in ("overview", "time_analysis", "behavioral", "symbols", "streaks", "equity_curve", "risk_metrics"):
             assert section in data
 
+    async def test_analytics_behavior_with_timezone(self, client: AsyncClient, auth_user: dict):
+        """Regression: /analytics/behavior must accept tz (behavioral_analysis forwards tz_offset_hours)."""
+        resp = await client.get(
+            "/api/analytics/behavior",
+            headers=auth_user["headers"],
+            params={"tz": 5},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert isinstance(data, dict)
+        assert "insufficient_data" in data or "revenge_trades" in data
+
 
 # =====================================================================
 # Auth endpoints

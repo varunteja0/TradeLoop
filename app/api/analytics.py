@@ -29,7 +29,7 @@ async def full_analytics(
     ta = TradeAnalytics()
     overview = ta.overall_metrics(trades, tz_offset_hours=tz_val)
     time_analysis = ta.time_analysis(trades, tz_offset_hours=tz_val)
-    behavioral = ta.behavioral_analysis(trades)
+    behavioral = ta.behavioral_analysis(trades, tz_offset_hours=tz_val)
     symbols = ta.symbol_analysis(trades)
     streaks = ta.streak_analysis(trades)
     equity_curve = ta.equity_curve_data(trades, tz_offset_hours=tz_val)
