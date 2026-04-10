@@ -23,8 +23,8 @@ jobs:
 
       - name: Type check
         run: |
-          pip install mypy
-          mypy app/ --ignore-missing-imports --no-strict-optional --allow-untyped-defs
+          pip install "mypy>=1.8,<2"
+          python -m mypy app/ --ignore-missing-imports --no-strict-optional --allow-untyped-defs
 
       - name: Run tests
         run: python -m pytest tests/ -v --tb=short
