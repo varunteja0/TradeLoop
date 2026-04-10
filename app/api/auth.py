@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from pydantic import EmailStr
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
@@ -17,7 +17,7 @@ from app.schemas.auth import (
     ChangePasswordRequest, UpdateProfileRequest, RefreshRequest,
 )
 from app.security import (
-    hash_password, verify_password, validate_password,
+    hash_password, verify_password, validate_password, normalize_email,
     create_access_token, create_refresh_token,
     decode_access_token, decode_refresh_token, TokenError,
 )
@@ -31,12 +31,13 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("3/minute")
 async def register(request: Request, req: RegisterRequest, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == req.email))
+    email_norm = normalize_email(str(req.email))
+    result = await db.execute(select(User).where(func.lower(User.email) == email_norm))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Email already registered")
 
     user = User(
-        email=req.email,
+        email=email_norm,
         hashed_password=hash_password(req.password),
         name=req.name,
     )
@@ -59,7 +60,8 @@ async def register(request: Request, req: RegisterRequest, db: AsyncSession = De
 @router.post("/login", response_model=AuthResponse)
 @limiter.limit("5/minute")
 async def login(request: Request, req: LoginRequest, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == req.email))
+    email_norm = normalize_email(str(req.email))
+    result = await db.execute(select(User).where(func.lower(User.email) == email_norm))
     user = result.scalar_one_or_none()
 
     if user and user.locked_until and user.locked_until > datetime.now(timezone.utc):
@@ -71,7 +73,7 @@ async def login(request: Request, req: LoginRequest, db: AsyncSession = Depends(
             if user.failed_login_count >= 5:
                 user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
             await db.flush()
-        logger.warning("Failed login attempt for: %s", req.email)
+        logger.warning("Failed login attempt for: %s", email_norm)
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     user.failed_login_count = 0
@@ -154,7 +156,8 @@ async def change_password(
 async def forgot_password(request: Request, email: EmailStr = Body(..., embed=True), db: AsyncSession = Depends(get_db)):
     """Send password reset email."""
     from app.services.email_service import EmailService
-    result = await db.execute(select(User).where(User.email == email))
+    email_norm = normalize_email(str(email))
+    result = await db.execute(select(User).where(func.lower(User.email) == email_norm))
     user = result.scalar_one_or_none()
     if not user:
         return {"message": "If that email is registered, a reset link has been sent."}

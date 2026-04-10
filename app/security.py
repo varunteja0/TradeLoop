@@ -14,6 +14,11 @@ settings = get_settings()
 MIN_PASSWORD_LENGTH = 8
 
 
+def normalize_email(email: str) -> str:
+    """Lowercase + strip for consistent login/register matching (emails are case-insensitive in practice)."""
+    return email.strip().lower()
+
+
 class TokenError(Exception):
     """Raised when token decode fails."""
     def __init__(self, reason: str):

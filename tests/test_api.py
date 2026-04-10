@@ -84,6 +84,18 @@ class TestLogin:
         })
         assert resp.status_code == 401
 
+    async def test_login_case_insensitive_email(self, client: AsyncClient):
+        await client.post("/api/auth/register", json={
+            "email": "CaseTest@Tradeloop.Dev",
+            "password": "Secure1pass",
+        })
+        resp = await client.post("/api/auth/login", json={
+            "email": "casetest@tradeloop.dev",
+            "password": "Secure1pass",
+        })
+        assert resp.status_code == 200
+        assert "access_token" in resp.json()
+
 
 # =====================================================================
 # CSV upload
