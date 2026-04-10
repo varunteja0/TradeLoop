@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
-from typing import Optional
+from typing import List, Optional, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
@@ -73,7 +73,7 @@ async def create_order(
         raise HTTPException(status_code=400, detail=f"You are already on the {body.plan} plan")
 
     plan_info = PLAN_LIMITS[body.plan]
-    amount = plan_info["price_inr"]
+    amount = cast(int, plan_info["price_inr"])
 
     if not settings.razorpay_key_id or not settings.razorpay_key_secret:
         if settings.environment == "production":
@@ -163,6 +163,6 @@ async def payment_status(user: User = Depends(get_current_user)):
     limits = PLAN_LIMITS.get(user.plan, PLAN_LIMITS["free"])
     return PaymentStatusResponse(
         plan=user.plan,
-        trade_limit=limits["trades"],
-        features=limits["features"],
+        trade_limit=cast(Optional[int], limits["trades"]),
+        features=cast(List[str], limits["features"]),
     )

@@ -8,13 +8,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, cast
 
 from sqlalchemy import select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.engine.csv_parser import parse_csv, validate_csv_size
+from app.engine.csv_parser import parse_csv, validate_csv_size, BrokerFormat
 from app.models.trade import Trade
 from app.models.user import User
 from app.services.event_bus import event_bus
@@ -55,7 +55,7 @@ class TradeService:
 
         remaining = await self._check_free_tier(db, user)
 
-        parsed, parse_errors = parse_csv(content, broker=broker)
+        parsed, parse_errors = parse_csv(content, broker=cast(BrokerFormat, broker))
         if not parsed:
             detail = "No valid trades found in the CSV."
             if parse_errors:

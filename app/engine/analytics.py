@@ -12,7 +12,7 @@ import statistics
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import DefaultDict, Dict, List, Optional
 
 from app.models.trade import Trade
 
@@ -95,7 +95,7 @@ class TradeAnalytics:
         hold_times = [t.duration_minutes for t in trades if t.duration_minutes is not None]
         total_fees = sum(t.fees for t in trades)
 
-        daily_pnl = defaultdict(float)
+        daily_pnl: DefaultDict[str, float] = defaultdict(float)
         for t in trades:
             adj = self._adjust_ts(t.timestamp, tz_offset_hours)
             daily_pnl[adj.date().isoformat()] += t.pnl
@@ -132,17 +132,17 @@ class TradeAnalytics:
         if not trades:
             return {}
 
-        hour_wins = defaultdict(int)
-        hour_total = defaultdict(int)
-        hour_pnl = defaultdict(float)
+        hour_wins: DefaultDict[int, int] = defaultdict(int)
+        hour_total: DefaultDict[int, int] = defaultdict(int)
+        hour_pnl: DefaultDict[int, float] = defaultdict(float)
 
-        dow_wins = defaultdict(int)
-        dow_total = defaultdict(int)
-        dow_pnl = defaultdict(float)
+        dow_wins: DefaultDict[str, int] = defaultdict(int)
+        dow_total: DefaultDict[str, int] = defaultdict(int)
+        dow_pnl: DefaultDict[str, float] = defaultdict(float)
 
-        session_wins = defaultdict(int)
-        session_total = defaultdict(int)
-        session_pnl = defaultdict(float)
+        session_wins: DefaultDict[str, int] = defaultdict(int)
+        session_total: DefaultDict[str, int] = defaultdict(int)
+        session_pnl: DefaultDict[str, float] = defaultdict(float)
 
         for t in trades:
             adj = self._adjust_ts(t.timestamp, tz_offset_hours)

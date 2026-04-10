@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.engine.prop_rules import PropComplianceEngine, FIRM_PRESETS
+from app.engine.prop_rules import ComplianceReport, PropComplianceEngine, FIRM_PRESETS
 from app.models.prop_account import PropAccount
 from app.models.trade import Trade
 from app.models.user import User
@@ -76,7 +76,7 @@ class ComplianceService:
         )
         return result.scalar_one_or_none()
 
-    async def check_compliance(self, db: AsyncSession, user: User, account: PropAccount) -> dict:
+    async def check_compliance(self, db: AsyncSession, user: User, account: PropAccount) -> ComplianceReport:
         trades_result = await db.execute(
             select(Trade).where(Trade.user_id == user.id).order_by(Trade.timestamp)
         )

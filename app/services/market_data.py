@@ -96,7 +96,7 @@ class MarketDataService:
         import httpx
 
         url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
-        params = {
+        params: dict[str, str | int] = {
             "period1": period1,
             "period2": period2,
             "interval": interval,

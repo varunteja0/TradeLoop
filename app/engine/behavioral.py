@@ -11,7 +11,7 @@ from __future__ import annotations
 import statistics
 from collections import defaultdict
 from datetime import timedelta
-from typing import Dict, List, Set
+from typing import Any, Dict, List, Set, cast
 
 from app.models.trade import Trade
 
@@ -91,7 +91,7 @@ class BehavioralAnalyzer:
         avg_daily = statistics.mean(len(v) for v in daily_counts.values())
         threshold = avg_daily * 2
 
-        overtrading = []
+        overtrading: List[Dict[str, Any]] = []
         for date, day_trades in daily_counts.items():
             if len(day_trades) > threshold:
                 pnl = sum(t.pnl for t in day_trades)
@@ -101,13 +101,13 @@ class BehavioralAnalyzer:
                     "pnl": round(pnl, 2),
                 })
 
-        total_pnl_overtrading = sum(d["pnl"] for d in overtrading)
+        total_pnl_overtrading = sum(cast(float, d["pnl"]) for d in overtrading)
 
         return {
             "count": len(overtrading),
             "avg_daily_trades": round(avg_daily, 1),
             "threshold": round(threshold, 1),
-            "days": sorted(overtrading, key=lambda x: x["pnl"])[:10],
+            "days": sorted(overtrading, key=lambda x: cast(float, x["pnl"]))[:10],
             "total_pnl_on_overtrading_days": round(total_pnl_overtrading, 2),
             "alert": (
                 f"You overtraded on {len(overtrading)} days (>{round(threshold, 0):.0f} trades/day). "
@@ -138,7 +138,7 @@ class BehavioralAnalyzer:
                         "outcome_pnl": round(trades[i].pnl, 2),
                     })
 
-        outcomes = [e["outcome_pnl"] for e in tilt_events]
+        outcomes = [cast(float, e["outcome_pnl"]) for e in tilt_events]
         return {
             "tilt_events": len(tilt_events),
             "events": tilt_events[:10],
