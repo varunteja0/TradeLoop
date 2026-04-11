@@ -33,6 +33,7 @@ class User(Base):
     timezone_offset: Mapped[int] = mapped_column(default=0)
     failed_login_count: Mapped[int] = mapped_column(default=0)
     locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime(), nullable=True)
+    last_export_at: Mapped[Optional[datetime]] = mapped_column(DateTime(), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(), default=_utcnow, onupdate=_utcnow)
 

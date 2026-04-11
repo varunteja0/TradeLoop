@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, EmailStr, field_validator
@@ -63,6 +64,7 @@ class UserOut(BaseModel):
     name: Optional[str]
     plan: str
     timezone_offset: int
+    last_export_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 

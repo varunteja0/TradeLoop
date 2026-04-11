@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import String, Float, DateTime, ForeignKey, Text, Index, CheckConstraint
+from sqlalchemy import String, Float, DateTime, ForeignKey, Text, Index, CheckConstraint, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -43,6 +43,9 @@ class Trade(Base):
     fees: Mapped[float] = mapped_column(Float, default=0.0)
     source: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # "csv", "zerodha", "angelone"
     mood: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)  # "confident", "fearful", "revenge", "fomo", "bored", "calm"
+    reason: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)  # why the trade was taken
+    rule_followed: Mapped[Optional[bool]] = mapped_column(nullable=True)  # did the trader follow their rules?
+    mistake_category: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # "early_exit", "no_stop_loss", "oversized", "fomo_entry", "revenge", "none"
     created_at: Mapped[datetime] = mapped_column(DateTime(), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(), default=_utcnow, onupdate=_utcnow)
 

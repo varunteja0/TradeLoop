@@ -172,12 +172,14 @@ class TradeService:
             select(Trade).where(Trade.user_id == user.id).order_by(Trade.timestamp)
         )
         trades = result.scalars().all()
-        lines = ["date,symbol,side,entry_price,exit_price,quantity,pnl,duration,setup,notes,fees"]
+        lines = ["date,symbol,side,entry_price,exit_price,quantity,pnl,duration,setup,notes,fees,mood,reason,rule_followed,mistake_category"]
         for t in trades:
             lines.append(
                 f"{t.timestamp.isoformat()},{t.symbol},{t.side},{t.entry_price},"
                 f"{t.exit_price},{t.quantity},{t.pnl},{t.duration_minutes or ''},"
-                f"{t.setup_type or ''},{(t.notes or '').replace(',', ';')},{t.fees}"
+                f"{t.setup_type or ''},{(t.notes or '').replace(',', ';')},{t.fees},"
+                f"{t.mood or ''},{(t.reason or '').replace(',', ';')},"
+                f"{'' if t.rule_followed is None else t.rule_followed},{t.mistake_category or ''}"
             )
         return "\n".join(lines)
 
@@ -186,7 +188,7 @@ class TradeService:
         trade = result.scalar_one_or_none()
         if not trade:
             raise LookupError("Trade not found")
-        allowed = {"mood", "notes", "setup_type"}
+        allowed = {"mood", "notes", "setup_type", "reason", "rule_followed", "mistake_category"}
         for key, value in updates.items():
             if key in allowed:
                 setattr(trade, key, value)

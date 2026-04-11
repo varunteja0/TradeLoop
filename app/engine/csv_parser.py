@@ -15,6 +15,8 @@ import re
 from datetime import datetime, timezone
 from typing import Dict, List, Literal, Optional, Tuple
 
+from dateutil import parser as dateutil_parser
+
 from app.schemas.trade import TradeCreate
 
 
@@ -33,7 +35,12 @@ def validate_csv_size(content: str) -> Optional[str]:
 def parse_csv(
     content: str, broker: BrokerFormat = "auto"
 ) -> Tuple[List[TradeCreate], List[str]]:
-    """Parse *content* and return ``(trades, errors)``."""
+    """Parse *content* and return ``(trades, errors)``.
+
+    When broker is "auto", tries the detected format first. If the detected
+    parser returns zero trades, falls back to other parsers so we never reject
+    a file we *could* have parsed.
+    """
     content = _strip_bom(content)
     if broker == "auto":
         broker = _detect_format(content)
@@ -47,16 +54,50 @@ def parse_csv(
     }
 
     parser = parsers.get(broker, parsers["generic"])
-    return parser(content)
+    trades, errors = parser(content)
+
+    if trades:
+        return trades, errors
+
+    # Fallback: try other parsers when the detected one fails
+    if broker != "generic":
+        fallback_trades, fallback_errors = parsers["generic"](content)
+        if fallback_trades:
+            return fallback_trades, fallback_errors
+
+    # Last resort: try tab delimiter if we haven't already
+    tab_delim = "\t" if delim != "\t" else ","
+    for fmt in ["generic", "mt4", "zerodha"]:
+        fb_parser = {
+            "generic": lambda c: _parse_generic(c, delimiter=tab_delim),
+            "mt4": lambda c: _parse_mt4(c, delimiter=tab_delim),
+            "zerodha": lambda c: _parse_zerodha(c, delimiter=tab_delim),
+        }[fmt]
+        fb_trades, fb_errors = fb_parser(content)
+        if fb_trades:
+            return fb_trades, fb_errors
+
+    return trades, errors
 
 
 def _detect_format(content: str) -> BrokerFormat:
     first_lines = content[:1000].lower()
 
-    if "trade_date" in first_lines or "tradingsymbol" in first_lines or "exchange" in first_lines:
+    if "trade_date" in first_lines or "tradingsymbol" in first_lines:
         return "zerodha"
-    if "ticket" in first_lines or "open time" in first_lines or "close time" in first_lines:
+
+    # MT4/MT5 native export has "Ticket" as a key column, or combined
+    # "Open Time" with actual datetime values (not just a header name
+    # alongside a separate "Open Date" column)
+    has_ticket = "ticket" in first_lines
+    has_open_time = "open time" in first_lines or "close time" in first_lines
+    has_open_date = "open date" in first_lines or "close date" in first_lines
+
+    if has_ticket:
         return "mt4"
+    if has_open_time and not has_open_date:
+        return "mt4"
+
     return "generic"
 
 
@@ -134,9 +175,15 @@ def _parse_generic(content: str, delimiter: str = ",") -> Tuple[List[TradeCreate
     trades: List[TradeCreate] = []
     errors: List[str] = []
 
+    time_col = col_map.get("_time_col")
+
     for row_num, row in enumerate(all_rows, start=2):
         try:
             raw_ts = row.get(col_map.get("timestamp", ""), "")
+            if time_col:
+                time_val = row.get(time_col, "").strip()
+                if time_val:
+                    raw_ts = f"{raw_ts.strip()} {time_val}"
             ts = _parse_timestamp(raw_ts)
             if ts is None:
                 errors.append(f"Row {row_num}: invalid timestamp '{raw_ts}'")
@@ -289,10 +336,16 @@ def _parse_mt4(content: str, delimiter: str = ",") -> Tuple[List[TradeCreate], L
     """
     MT4/MT5 CSV statement export:
     Ticket, Open Time, Close Time, Type, Size, Symbol, Open Price, Close Price, Commission, Swap, Profit
+
+    Also handles split date/time columns:
+    Symbol, Type, Open Date, Open Time, Open Price, Close Date, Close Time, ...
     """
     reader = csv.DictReader(io.StringIO(content), delimiter=delimiter)
     if reader.fieldnames is None:
         return [], []
+
+    fields_lower = {f.strip().lower() for f in reader.fieldnames}
+    has_split_datetime = "open date" in fields_lower or "close date" in fields_lower
 
     trades: List[TradeCreate] = []
     errors: List[str] = []
@@ -300,24 +353,36 @@ def _parse_mt4(content: str, delimiter: str = ",") -> Tuple[List[TradeCreate], L
     for row_num, row in enumerate(reader, start=2):
         row_clean = {k.strip().lower(): v.strip() for k, v in row.items()}
         try:
-            trade_type = row_clean.get("type", "").lower()
+            trade_type = row_clean.get("type", row_clean.get("direction", "")).lower()
             if trade_type not in ("buy", "sell"):
                 continue
 
-            raw_open = row_clean.get("open time", row_clean.get("opentime", ""))
+            if has_split_datetime:
+                open_date = row_clean.get("open date", row_clean.get("opened", ""))
+                open_time_str = row_clean.get("open time", "")
+                raw_open = f"{open_date} {open_time_str}".strip() if open_time_str else open_date
+                close_date = row_clean.get("close date", row_clean.get("closed", ""))
+                close_time_str = row_clean.get("close time", "")
+                raw_close = f"{close_date} {close_time_str}".strip() if close_time_str else close_date
+            else:
+                raw_open = row_clean.get("open time", row_clean.get("opentime", ""))
+                raw_close = row_clean.get("close time", row_clean.get("closetime", ""))
+
             open_time = _parse_timestamp(raw_open)
-            raw_close = row_clean.get("close time", row_clean.get("closetime", ""))
             close_time = _parse_timestamp(raw_close)
             if open_time is None:
                 errors.append(f"Row {row_num}: invalid open time '{raw_open}'")
                 continue
 
-            symbol = row_clean.get("symbol", row_clean.get("item", "UNKNOWN")).upper()
-            entry = _parse_float(row_clean.get("open price", row_clean.get("openprice", "0")))
-            exit_p = _parse_float(row_clean.get("close price", row_clean.get("closeprice", "0")))
+            symbol = row_clean.get(
+                "symbol",
+                row_clean.get("item", row_clean.get("instrument", "UNKNOWN")),
+            ).upper()
+            entry = _parse_float(row_clean.get("open price", row_clean.get("openprice", row_clean.get("open", "0"))))
+            exit_p = _parse_float(row_clean.get("close price", row_clean.get("closeprice", row_clean.get("close", "0"))))
             size = _parse_float(row_clean.get("size", row_clean.get("volume", "1")))
 
-            commission = _parse_float(row_clean.get("commission", "0"))
+            commission = _parse_float(row_clean.get("commission", row_clean.get("comm", "0")))
             swap = _parse_float(row_clean.get("swap", "0"))
             profit = _parse_float(row_clean.get("profit", "0"))
             pnl = profit + commission + swap
@@ -675,9 +740,10 @@ def _parse_headerless(content: str, delimiter: str = ",") -> Tuple[List[TradeCre
 
 COLUMN_ALIASES: Dict[str, List[str]] = {
     "timestamp": [
-        "date", "timestamp", "time", "datetime", "trade_date", "open_time",
-        "entry_time", "close_time", "exit_time", "open_date", "close_date",
-        "entry_date", "exit_date", "trade_time", "executed_at", "execution_time",
+        "date", "timestamp", "datetime", "trade_date",
+        "open_date", "entry_date", "close_date", "closed_date", "exit_date",
+        "open_time", "entry_time", "close_time", "exit_time",
+        "time", "trade_time", "executed_at", "execution_time",
         "created_at", "filled_at", "order_time", "order_date",
     ],
     "symbol": [
@@ -690,12 +756,12 @@ COLUMN_ALIASES: Dict[str, List[str]] = {
         "b/s", "bs", "order_type", "transaction_type", "buy/sell",
     ],
     "entry_price": [
-        "entry_price", "entry", "open_price", "buy_price", "price_in",
+        "entry_price", "entry", "open_price", "open", "buy_price", "price_in",
         "avg_price", "average_price", "price", "fill_price", "executed_price",
     ],
     "exit_price": [
-        "exit_price", "exit", "close_price", "sell_price", "price_out",
-        "closing_price",
+        "exit_price", "exit", "close_price", "closed", "close", "sell_price",
+        "price_out", "closing_price",
     ],
     "quantity": [
         "quantity", "qty", "size", "volume", "lots", "shares",
@@ -734,12 +800,42 @@ def _build_column_map_smart(
     headers: List[str], sample_rows: List[Dict[str, str]]
 ) -> Dict[str, str]:
     """
-    Two-pass column mapping:
+    Multi-pass column mapping:
     1. Try header-name matching (existing logic)
-    2. If timestamp column not found, scan sample data to find a column
-       that contains parseable dates
+    2. If timestamp column maps to a time-only value, look for adjacent date column
+    3. If timestamp column not found, scan sample data
+    4. Detect PnL / symbol columns from data patterns
     """
     mapping = _build_column_map(headers)
+
+    # Check if timestamp maps to a time-only column (split date/time scenario)
+    if "timestamp" in mapping and sample_rows:
+        ts_col = mapping["timestamp"]
+        sample_val = sample_rows[0].get(ts_col, "").strip()
+        if sample_val and _is_time_only_cell(sample_val):
+            # The timestamp column only has time — find adjacent date column
+            ts_idx = headers.index(ts_col)
+            if ts_idx > 0:
+                date_col = headers[ts_idx - 1]
+                date_val = sample_rows[0].get(date_col, "").strip()
+                if date_val and _parse_timestamp(date_val) is not None:
+                    mapping["timestamp"] = date_col
+                    mapping["_time_col"] = ts_col
+
+    # If timestamp maps to a date-only column, check for adjacent time column
+    if "timestamp" in mapping and "_time_col" not in mapping and sample_rows:
+        ts_col = mapping["timestamp"]
+        ts_idx = headers.index(ts_col) if ts_col in headers else -1
+        sample_val = sample_rows[0].get(ts_col, "").strip()
+        if ts_idx >= 0 and sample_val and _parse_timestamp(sample_val) is not None:
+            ts_parsed = _parse_timestamp(sample_val)
+            if ts_parsed and ts_parsed.hour == 0 and ts_parsed.minute == 0:
+                # Date-only — check next column for time
+                if ts_idx + 1 < len(headers):
+                    next_col = headers[ts_idx + 1]
+                    next_val = sample_rows[0].get(next_col, "").strip()
+                    if next_val and _is_time_only_cell(next_val):
+                        mapping["_time_col"] = next_col
 
     if "timestamp" not in mapping and sample_rows:
         for h in headers:
@@ -752,8 +848,9 @@ def _build_column_map_smart(
                 break
 
     if "pnl" not in mapping and sample_rows:
+        mapped_cols = set(mapping.values())
         for h in headers:
-            if h in [mapping.get(k) for k in mapping]:
+            if h in mapped_cols:
                 continue
             money_count = 0
             for row in sample_rows[:5]:
@@ -765,8 +862,9 @@ def _build_column_map_smart(
                 break
 
     if "symbol" not in mapping and sample_rows:
+        mapped_cols = set(mapping.values())
         for h in headers:
-            if h in [mapping.get(k) for k in mapping]:
+            if h in mapped_cols:
                 continue
             alpha_count = 0
             for row in sample_rows[:5]:
@@ -813,6 +911,10 @@ def _parse_timestamp(value: str) -> Optional[datetime]:
 
     value = value.strip()
 
+    # Normalize comma-separated date+time (e.g. "1/30/2026, 22:18" → "1/30/2026 22:18")
+    value = re.sub(r"(\d),\s+(\d)", r"\1 \2", value)
+
+    # Pass 1: try explicit formats (fast, unambiguous)
     for fmt in _TIMESTAMP_FORMATS:
         try:
             dt = datetime.strptime(value, fmt)
@@ -821,6 +923,29 @@ def _parse_timestamp(value: str) -> Optional[datetime]:
             return dt
         except ValueError:
             continue
+
+    # Pass 2: try Unix epoch (integer or float seconds since 1970)
+    try:
+        epoch = float(value)
+        if 1e9 < epoch < 2e10:  # seconds: 2001–2603
+            dt = datetime.fromtimestamp(epoch, tz=timezone.utc)
+            return dt
+        if 1e12 < epoch < 2e13:  # milliseconds
+            dt = datetime.fromtimestamp(epoch / 1000, tz=timezone.utc)
+            return dt
+    except (ValueError, OverflowError, OSError):
+        pass
+
+    # Pass 3: dateutil fuzzy parser — handles almost any human-readable format
+    # ("30 Jan 2026", "January 30 2026 10:18 PM", "2026/01/30", etc.)
+    try:
+        dt = dateutil_parser.parse(value, dayfirst=False, fuzzy=True)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        if 2000 <= dt.year <= 2100:
+            return dt
+    except (ValueError, OverflowError):
+        pass
 
     return None
 

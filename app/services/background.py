@@ -73,9 +73,102 @@ async def check_all_compliance(user_id: str) -> None:
         await db.commit()
 
 
+async def auto_tag_trades(user_id: str) -> None:
+    """Run rules-based auto-tagging on trades missing mood/mistake tags."""
+    from app.engine.auto_tagger import auto_tagger
+
+    async with async_session() as db:
+        result = await db.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        if not user:
+            return
+
+        trades_result = await db.execute(
+            select(Trade).where(Trade.user_id == user_id).order_by(Trade.timestamp)
+        )
+        trades = list(trades_result.scalars().all())
+        if len(trades) < 2:
+            return
+
+        updates = auto_tagger.tag_trades(trades)
+        if not updates:
+            return
+
+        trade_map = {t.id: t for t in trades}
+        for trade_id, changes in updates:
+            trade = trade_map.get(trade_id)
+            if trade:
+                for key, value in changes.items():
+                    setattr(trade, key, value)
+
+        await db.commit()
+        logger.info("Auto-tagged %d trades for user %s", len(updates), user.email)
+
+
+async def check_trading_rules(user_id: str) -> None:
+    """Check all user-defined trading rules and store violations."""
+    from app.engine.rule_checker import rule_checker
+    from app.models.trading_rule import TradingRule
+    from app.models.rule_violation import RuleViolation
+
+    async with async_session() as db:
+        result = await db.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        if not user:
+            return
+
+        rules_result = await db.execute(
+            select(TradingRule).where(TradingRule.user_id == user_id, TradingRule.is_active == True)
+        )
+        rules = list(rules_result.scalars().all())
+        if not rules:
+            return
+
+        trades_result = await db.execute(
+            select(Trade).where(Trade.user_id == user_id).order_by(Trade.timestamp)
+        )
+        trades = list(trades_result.scalars().all())
+        if not trades:
+            return
+
+        violations = rule_checker.check_all(trades, rules, user.timezone_offset)
+        if not violations:
+            return
+
+        existing_result = await db.execute(
+            select(RuleViolation.trade_id, RuleViolation.rule_id)
+            .where(RuleViolation.user_id == user_id)
+        )
+        existing = {(row[0], row[1]) for row in existing_result.all()}
+
+        new_count = 0
+        for v in violations:
+            trade_id = v.trade.id if v.trade else None
+            key = (trade_id, v.rule.id)
+            if key in existing:
+                continue
+
+            violation = RuleViolation(
+                user_id=user_id,
+                rule_id=v.rule.id,
+                trade_id=trade_id,
+                rule_type=v.rule.rule_type,
+                message=v.message,
+                severity=v.severity,
+            )
+            db.add(violation)
+            new_count += 1
+
+        if new_count > 0:
+            await db.commit()
+            logger.info("Found %d new rule violations for user %s", new_count, user.email)
+
+
 async def run_post_upload(user_id: str) -> None:
-    """Run precompute + compliance AFTER the response is sent."""
+    """Run auto-tag + rules + precompute + compliance AFTER the response is sent."""
     try:
+        await auto_tag_trades(user_id)
+        await check_trading_rules(user_id)
         await precompute_analytics(user_id)
         await check_all_compliance(user_id)
     except Exception:

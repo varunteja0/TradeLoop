@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.config import get_settings
 from app.db import Base
-from app.models import User, Trade  # noqa: F401 — ensure models are registered
+from app.models import User, Trade, BrokerConnection, PropAccount, AuditLog, TradingRule, RuleViolation  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

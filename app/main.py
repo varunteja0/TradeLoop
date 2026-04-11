@@ -14,7 +14,7 @@ from slowapi.errors import RateLimitExceeded
 from app.config import get_settings
 from app.db import engine, Base
 from app.rate_limit import limiter
-from app.api import auth, trades, analytics, payments, insights, prop_accounts, broker_connect, reports, market_data, admin
+from app.api import auth, trades, analytics, payments, insights, prop_accounts, broker_connect, reports, market_data, admin, rules
 
 from app.logging_config import setup_logging
 setup_logging()
@@ -38,9 +38,10 @@ if sentry_dsn:
 
 OPENAPI_TAGS = [
     {"name": "auth", "description": "Registration, login, token refresh, password management"},
-    {"name": "trades", "description": "Trade CRUD, CSV upload/export, mood tagging"},
+    {"name": "trades", "description": "Trade CRUD, CSV upload/export, mood tagging, synthetic generation"},
     {"name": "analytics", "description": "Full analytics, equity curve, risk metrics, emotions"},
-    {"name": "insights", "description": "Counterfactual dollar-value analysis"},
+    {"name": "insights", "description": "Counterfactual analysis and behavioral intelligence alerts"},
+    {"name": "rules", "description": "User-defined trading rules and violation tracking"},
     {"name": "prop-firm", "description": "Prop firm accounts and compliance tracking"},
     {"name": "broker-connect", "description": "Broker connection and trade sync"},
     {"name": "reports", "description": "Weekly intelligence reports"},
@@ -139,6 +140,7 @@ for prefix in (V1_PREFIX, COMPAT_PREFIX):
     app.include_router(reports.router, prefix=prefix)
     app.include_router(market_data.router, prefix=prefix)
     app.include_router(admin.router, prefix=prefix)
+    app.include_router(rules.router, prefix=prefix)
 
 
 @app.get("/api/health")

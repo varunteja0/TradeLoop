@@ -19,6 +19,18 @@ class TradeCreate(BaseModel):
     notes: Optional[str] = None
     fees: float = 0.0
     mood: Optional[str] = None
+    reason: Optional[str] = None
+    rule_followed: Optional[bool] = None
+    mistake_category: Optional[str] = None
+
+
+VALID_MISTAKE_CATEGORIES = {
+    "early_exit", "late_exit", "no_stop_loss", "moved_stop_loss",
+    "oversized", "undersized", "fomo_entry", "revenge", "chased",
+    "ignored_signal", "overtraded", "none",
+}
+
+VALID_MOODS = {"confident", "fearful", "revenge", "fomo", "bored", "calm", "anxious", "greedy", "neutral"}
 
 
 class TradeOut(BaseModel):
@@ -35,6 +47,9 @@ class TradeOut(BaseModel):
     notes: Optional[str]
     fees: float
     mood: Optional[str] = None
+    reason: Optional[str] = None
+    rule_followed: Optional[bool] = None
+    mistake_category: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
