@@ -12,13 +12,13 @@ from __future__ import annotations
 import csv
 import io
 import re
+import sys
 from datetime import datetime, timezone
 from typing import Dict, List, Literal, Optional, Tuple
 
-from dateutil import parser as dateutil_parser
-
 from app.schemas.trade import TradeCreate
 
+csv.field_size_limit(min(sys.maxsize, 10 * 1024 * 1024))
 
 BrokerFormat = Literal["generic", "zerodha", "mt4", "auto"]
 
@@ -934,17 +934,6 @@ def _parse_timestamp(value: str) -> Optional[datetime]:
             dt = datetime.fromtimestamp(epoch / 1000, tz=timezone.utc)
             return dt
     except (ValueError, OverflowError, OSError):
-        pass
-
-    # Pass 3: dateutil fuzzy parser — handles almost any human-readable format
-    # ("30 Jan 2026", "January 30 2026 10:18 PM", "2026/01/30", etc.)
-    try:
-        dt = dateutil_parser.parse(value, dayfirst=False, fuzzy=True)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        if 2000 <= dt.year <= 2100:
-            return dt
-    except (ValueError, OverflowError):
         pass
 
     return None

@@ -37,6 +37,22 @@ export const useAuth = create<AuthState>((set, get) => ({
       set({ user: data });
       localStorage.setItem("tradeloop_user", JSON.stringify(data));
     } catch {
+      // Access token expired — try refreshing before giving up
+      const refresh = localStorage.getItem("tradeloop_refresh_token");
+      if (refresh) {
+        try {
+          const { data } = await api.post("/auth/refresh", { refresh_token: refresh });
+          localStorage.setItem("tradeloop_token", data.access_token);
+          if (data.refresh_token) {
+            localStorage.setItem("tradeloop_refresh_token", data.refresh_token);
+          }
+          localStorage.setItem("tradeloop_user", JSON.stringify(data.user));
+          set({ user: data.user, token: data.access_token, hydrated: true });
+          return;
+        } catch {
+          // Refresh token also expired — full logout
+        }
+      }
       localStorage.removeItem("tradeloop_token");
       localStorage.removeItem("tradeloop_refresh_token");
       localStorage.removeItem("tradeloop_user");
