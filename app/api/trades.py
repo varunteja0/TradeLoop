@@ -8,22 +8,18 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request,
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import get_settings
 from app.db import get_db
 from app.dependencies import get_current_user
-from app.rate_limit import limiter
 from app.models.user import User
 from app.schemas.trade import TradeOut, TradeListResponse, UploadResponse
 from app.services.background import run_post_upload
 from app.services import trade_svc as trade_service
 
 router = APIRouter(prefix="/trades", tags=["trades"])
-settings = get_settings()
 UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 
 
 @router.post("/upload", response_model=UploadResponse)
-@limiter.limit("10/minute")
 async def upload_csv(
     request: Request,
     file: UploadFile = File(...),
@@ -36,8 +32,6 @@ async def upload_csv(
         raise HTTPException(status_code=400, detail="Please upload a CSV file")
 
     raw = await file.read()
-    if len(raw) > settings.max_upload_size_bytes:
-        raise HTTPException(status_code=413, detail="File too large. Maximum size is 5MB.")
 
     try:
         content = raw.decode("utf-8-sig")
@@ -59,7 +53,7 @@ async def upload_csv(
 @router.get("", response_model=TradeListResponse)
 async def list_trades(
     page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=1, le=200),
+    per_page: int = Query(50, ge=1, le=1000),
     symbol: Optional[str] = Query(None),
     side: Optional[str] = Query(None),
     sort_by: str = Query("timestamp"),
@@ -139,7 +133,7 @@ async def load_sample_data(
 @router.post("/generate-synthetic")
 async def generate_synthetic(
     scenario: str = Query("mixed"),
-    count: int = Query(50, ge=10, le=500),
+    count: int = Query(50, ge=1, le=5000),
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -155,10 +149,6 @@ async def generate_synthetic(
             status_code=400,
             detail=f"Invalid scenario. Must be one of: {', '.join(sorted(valid_scenarios))}",
         )
-
-    remaining = await trade_service._check_free_tier(db, user)
-    if remaining is not None:
-        count = min(count, remaining)
 
     synthetic_trades = synthetic_generator.generate(scenario=scenario, num_trades=count)
 

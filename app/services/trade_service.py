@@ -14,7 +14,7 @@ from sqlalchemy import select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.engine.csv_parser import parse_csv, validate_csv_size, BrokerFormat
+from app.engine.csv_parser import parse_csv, BrokerFormat
 from app.models.trade import Trade
 from app.models.user import User
 from app.services.event_bus import event_bus
@@ -49,25 +49,16 @@ class TradeService:
         if broker not in VALID_BROKERS:
             raise ValueError(f"Invalid broker. Must be one of: {', '.join(VALID_BROKERS)}")
 
-        size_error = validate_csv_size(content)
-        if size_error:
-            raise ValueError(size_error)
-
-        remaining = await self._check_free_tier(db, user)
-
         parsed, parse_errors = parse_csv(content, broker=cast(BrokerFormat, broker))
         if not parsed:
             detail = "No valid trades found in the CSV."
             if parse_errors:
-                detail += " Errors: " + "; ".join(parse_errors[:3])
+                detail += " Errors: " + "; ".join(parse_errors)
             raise ValueError(detail)
-
-        if user.plan == "free" and remaining is not None:
-            parsed = parsed[:remaining]
 
         imported = 0
         skipped = 0
-        errors = list(parse_errors[:5])
+        errors = list(parse_errors)
 
         for trade_data in parsed:
             try:
@@ -98,7 +89,7 @@ class TradeService:
         if imported > 0:
             await event_bus.emit("trade.uploaded", user_id=user.id, count=imported)
 
-        return UploadResult(imported=imported, skipped=skipped, errors=errors[:5])
+        return UploadResult(imported=imported, skipped=skipped, errors=errors)
 
     async def list_trades(
         self,
@@ -202,17 +193,5 @@ class TradeService:
         return [{"symbol": row[0], "count": row[1]} for row in result.all()]
 
     async def _check_free_tier(self, db: AsyncSession, user: User) -> Optional[int]:
-        """Returns remaining trade slots for free tier, or None for paid users."""
-        if user.plan != "free":
-            return None
-        existing_count_result = await db.execute(
-            select(func.count()).select_from(Trade).where(Trade.user_id == user.id)
-        )
-        existing_count = existing_count_result.scalar() or 0
-        remaining = max(0, settings.free_tier_trade_limit - existing_count)
-        if remaining == 0:
-            raise PermissionError(
-                f"Free tier limit reached ({settings.free_tier_trade_limit} trades). "
-                f"Upgrade to Pro for unlimited trades."
-            )
-        return remaining
+        """Returns remaining trade slots, or None for unlimited (all plans now unlimited)."""
+        return None

@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
 from app.dependencies import get_current_user
-from app.rate_limit import limiter
 from app.models.user import User
 from app.schemas.auth import (
     RegisterRequest, LoginRequest, AuthResponse, UserOut,
@@ -29,7 +28,6 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
-@limiter.limit("3/minute")
 async def register(request: Request, req: RegisterRequest, db: AsyncSession = Depends(get_db)):
     email_norm = normalize_email(str(req.email))
     result = await db.execute(select(User).where(func.lower(User.email) == email_norm))
@@ -58,26 +56,14 @@ async def register(request: Request, req: RegisterRequest, db: AsyncSession = De
 
 
 @router.post("/login", response_model=AuthResponse)
-@limiter.limit("5/minute")
 async def login(request: Request, req: LoginRequest, db: AsyncSession = Depends(get_db)):
     email_norm = normalize_email(str(req.email))
     result = await db.execute(select(User).where(func.lower(User.email) == email_norm))
     user = result.scalar_one_or_none()
 
-    if user and user.locked_until and user.locked_until > datetime.now(timezone.utc):
-        raise HTTPException(status_code=429, detail="Account temporarily locked. Try again in 15 minutes.")
-
     if not user or not verify_password(req.password, user.hashed_password):
-        if user:
-            user.failed_login_count = (user.failed_login_count or 0) + 1
-            if user.failed_login_count >= 5:
-                user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
-            await db.flush()
         logger.warning("Failed login attempt for: %s", email_norm)
         raise HTTPException(status_code=401, detail="Invalid email or password")
-
-    user.failed_login_count = 0
-    user.locked_until = None
 
     logger.info("User logged in: %s", user.email)
     await audit_service.log(db, user.id, "login", ip=request.client.host)
@@ -152,7 +138,6 @@ async def change_password(
 
 
 @router.post("/forgot-password")
-@limiter.limit("3/minute")
 async def forgot_password(request: Request, email: EmailStr = Body(..., embed=True), db: AsyncSession = Depends(get_db)):
     """Send password reset email."""
     from app.services.email_service import EmailService

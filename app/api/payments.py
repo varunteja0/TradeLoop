@@ -20,7 +20,7 @@ logger = logging.getLogger("tradeloop.payments")
 router = APIRouter(tags=["payments"])
 
 PLAN_LIMITS = {
-    "free": {"trades": 50, "features": ["basic_analytics", "csv_upload"]},
+    "free": {"trades": None, "features": ["basic_analytics", "csv_upload", "advanced_analytics", "behavior_alerts", "export", "broker_sync", "insights", "weekly_reports"]},
     "pro": {"trades": None, "price_inr": 99900, "features": ["basic_analytics", "csv_upload", "advanced_analytics", "behavior_alerts", "export", "broker_sync", "insights", "weekly_reports"]},
     "prop_trader": {"trades": None, "price_inr": 149900, "features": ["basic_analytics", "csv_upload", "advanced_analytics", "behavior_alerts", "export", "broker_sync", "insights", "weekly_reports", "prop_compliance", "multi_account", "real_time_alerts"]},
 }
