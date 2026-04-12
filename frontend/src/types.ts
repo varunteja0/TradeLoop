@@ -178,6 +178,20 @@ export interface Trade {
   notes: string | null;
   fees: number;
   mood: string | null;
+  reason: string | null;
+  rule_followed: boolean | null;
+  mistake_category: string | null;
+}
+
+export interface IntelligenceAlert {
+  id: string;
+  type: string;
+  severity: "critical" | "warning" | "info" | "positive";
+  title: string;
+  message: string;
+  dollar_impact: number | null;
+  affected_trades: number;
+  recommendation: string | null;
 }
 
 export interface User {

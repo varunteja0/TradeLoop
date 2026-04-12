@@ -125,6 +125,9 @@ function EmptyDashboard({ onSampleLoaded }: { onSampleLoaded: () => void }) {
     }
   }, []);
 
+  const [syntheticScenario, setSyntheticScenario] = useState("mixed");
+  const [loadingSynthetic, setLoadingSynthetic] = useState(false);
+
   const handleLoadSample = async () => {
     setLoadingSample(true);
     setShowModal(false);
@@ -136,6 +139,19 @@ function EmptyDashboard({ onSampleLoaded }: { onSampleLoaded: () => void }) {
       toast(err.response?.data?.detail || "Failed to load sample data", "error");
     } finally {
       setLoadingSample(false);
+    }
+  };
+
+  const handleGenerateSynthetic = async () => {
+    setLoadingSynthetic(true);
+    try {
+      const { data } = await api.post(`/trades/generate-synthetic?scenario=${syntheticScenario}&count=100`);
+      toast(`${data.imported} ${syntheticScenario} trades generated!`, "success");
+      onSampleLoaded();
+    } catch (err: any) {
+      toast(err.response?.data?.detail || "Failed to generate trades", "error");
+    } finally {
+      setLoadingSynthetic(false);
     }
   };
 
@@ -178,6 +194,35 @@ function EmptyDashboard({ onSampleLoaded }: { onSampleLoaded: () => void }) {
           <p className="text-xs text-gray-500 mt-6">
             The sample data shows real analytics so you can see what TradeLoop does before uploading your own trades.
           </p>
+
+          <div className="mt-10 pt-8 border-t border-border">
+            <h3 className="text-sm font-semibold text-gray-300 mb-3">Generate Synthetic Trades</h3>
+            <p className="text-xs text-gray-500 mb-4">
+              Simulate realistic trading scenarios with behavioral patterns — overtrading, revenge trading, streaks, and more.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+              <select
+                value={syntheticScenario}
+                onChange={(e) => setSyntheticScenario(e.target.value)}
+                className="input-field text-sm py-2 px-3 bg-bg-card border border-border rounded-lg text-gray-300"
+              >
+                <option value="mixed">Mixed Patterns</option>
+                <option value="revenge_heavy">Revenge Trading Heavy</option>
+                <option value="overtrading">Overtrading</option>
+                <option value="disciplined">Disciplined Trader</option>
+                <option value="losing_streak">Losing Streak</option>
+                <option value="risk_mismanagement">Risk Mismanagement</option>
+                <option value="improving">Improving Trader</option>
+              </select>
+              <button
+                onClick={handleGenerateSynthetic}
+                disabled={loadingSynthetic}
+                className="btn-secondary px-6 py-2 text-sm"
+              >
+                {loadingSynthetic ? "Generating..." : "Generate 100 Trades"}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </>

@@ -243,11 +243,41 @@ function InsightCard({
   );
 }
 
+interface Alert {
+  id: string;
+  type: string;
+  severity: "critical" | "warning" | "insight";
+  title: string;
+  message: string;
+  dollar_impact: number | null;
+  affected_trades: number;
+  recommendation: string | null;
+}
+
+interface AlertsResponse {
+  alerts: Alert[];
+  total_alerts: number;
+  summary: {
+    total_trades: number;
+    total_pnl: number;
+    mood_tagged_pct: number;
+    rule_followed_pct: number | null;
+  } | null;
+}
+
+const ALERT_SEVERITY_STYLES: Record<string, { bg: string; border: string; icon: string }> = {
+  critical: { bg: "bg-red-500/10", border: "border-red-500/30", icon: "text-red-400" },
+  warning: { bg: "bg-yellow-500/10", border: "border-yellow-500/30", icon: "text-yellow-400" },
+  insight: { bg: "bg-blue-500/10", border: "border-blue-500/30", icon: "text-blue-400" },
+};
+
 export default function Insights() {
   const [data, setData] = useState<InsightsResponse | null>(null);
+  const [alerts, setAlerts] = useState<AlertsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState<"counterfactual" | "alerts">("alerts");
   const user = useAuth((s) => s.user);
   const logout = useAuth((s) => s.logout);
 
@@ -256,16 +286,15 @@ export default function Insights() {
   }, []);
 
   useEffect(() => {
-    api
-      .get("/insights/full")
-      .then(({ data }) => setData(data))
-      .catch((err: unknown) => {
-        const msg =
-          (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
-          "Failed to load insights";
-        setError(msg);
-      })
-      .finally(() => setLoading(false));
+    Promise.all([
+      api.get("/insights/full").then(({ data }) => setData(data)).catch(() => null),
+      api.get("/insights/alerts").then(({ data }) => setAlerts(data)).catch(() => null),
+    ]).catch((err: unknown) => {
+      const msg =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        "Failed to load insights";
+      setError(msg);
+    }).finally(() => setLoading(false));
   }, []);
 
   const sortedInsights = (data?.insights ?? [])
@@ -298,6 +327,34 @@ export default function Insights() {
       </nav>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+        <div className="flex gap-2 mb-6">
+          <button
+            onClick={() => setActiveView("alerts")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeView === "alerts"
+                ? "bg-accent text-bg-primary"
+                : "text-gray-400 hover:text-white hover:bg-bg-hover"
+            }`}
+          >
+            Intelligence Alerts
+            {alerts && alerts.total_alerts > 0 && (
+              <span className="ml-2 bg-red-500/20 text-red-400 text-xs px-1.5 py-0.5 rounded-full">
+                {alerts.total_alerts}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveView("counterfactual")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeView === "counterfactual"
+                ? "bg-accent text-bg-primary"
+                : "text-gray-400 hover:text-white hover:bg-bg-hover"
+            }`}
+          >
+            Counterfactual Analysis
+          </button>
+        </div>
+
         {loading ? (
           <InsightsSkeleton />
         ) : error ? (
@@ -307,6 +364,64 @@ export default function Insights() {
               Back to Dashboard
             </Link>
           </div>
+        ) : activeView === "alerts" ? (
+          alerts && alerts.alerts.length > 0 ? (
+            <div className="space-y-4">
+              {alerts.summary && (
+                <div className="bg-gradient-to-r from-bg-card to-bg-hover rounded-xl p-6 border border-border mb-6">
+                  <h2 className="text-lg font-bold text-white mb-1">Behavioral Intelligence</h2>
+                  <p className="text-sm text-gray-400">
+                    {alerts.total_alerts} pattern{alerts.total_alerts !== 1 ? "s" : ""} detected across {alerts.summary.total_trades} trades.
+                    {alerts.summary.mood_tagged_pct > 0 && (
+                      <span> {Math.round(alerts.summary.mood_tagged_pct)}% mood-tagged.</span>
+                    )}
+                  </p>
+                </div>
+              )}
+              {alerts.alerts.map((alert, idx) => {
+                const sev = ALERT_SEVERITY_STYLES[alert.severity] ?? ALERT_SEVERITY_STYLES.insight;
+                return (
+                  <div key={idx} className={`rounded-xl p-5 border ${sev.bg} ${sev.border}`}>
+                    <div className="flex items-start gap-3">
+                      <span className={`text-lg ${sev.icon} mt-0.5`}>
+                        {alert.severity === "critical" ? "🚨" : alert.severity === "warning" ? "⚠️" : "💡"}
+                      </span>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="text-sm font-semibold text-white">{alert.title}</h3>
+                          {alert.dollar_impact != null && alert.dollar_impact !== 0 && (
+                            <span className={`text-xs font-mono font-bold ${alert.dollar_impact < 0 ? "text-red-400" : "text-emerald-400"}`}>
+                              {formatDollar(alert.dollar_impact)}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-300 leading-relaxed">{alert.message}</p>
+                        {alert.recommendation && (
+                          <p className="text-xs text-accent mt-2">{alert.recommendation}</p>
+                        )}
+                        {alert.affected_trades > 0 && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {alert.affected_trades} trade{alert.affected_trades !== 1 ? "s" : ""} affected
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-20">
+              <div className="text-6xl mb-4 opacity-20">&#x1f50d;</div>
+              <h2 className="text-2xl font-bold text-white mb-2">No alerts yet</h2>
+              <p className="text-gray-400 mb-6">
+                Upload trades and tag your moods to unlock behavioral intelligence.
+              </p>
+              <Link to="/upload" className="btn-primary">
+                Upload Trades
+              </Link>
+            </div>
+          )
         ) : !data || data.insights.length === 0 ? (
           <div className="text-center py-20">
             <div className="text-6xl mb-4 opacity-20">&#x1f50d;</div>

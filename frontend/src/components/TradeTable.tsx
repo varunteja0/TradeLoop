@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/client";
 import type { Trade } from "../types";
@@ -109,14 +109,17 @@ export default function TradeTable() {
     [fetchTrades],
   );
 
-  const handleMoodChange = useCallback(
-    (tradeId: string, mood: string) => {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editingReason, setEditingReason] = useState<string>("");
+
+  const handleFieldChange = useCallback(
+    (tradeId: string, field: string, value: unknown) => {
       setTrades((prev) =>
         prev.map((t) =>
-          t.id === tradeId ? { ...t, mood: mood || null } : t,
+          t.id === tradeId ? { ...t, [field]: value || null } : t,
         ),
       );
-      api.patch(`/trades/${tradeId}`, { mood: mood || null }).catch(() => {
+      api.patch(`/trades/${tradeId}`, { [field]: value || null }).catch(() => {
         fetchTrades();
       });
     },
@@ -278,6 +281,12 @@ export default function TradeTable() {
                 <th className="text-left pb-3 px-2 hidden md:table-cell" scope="col">
                   Mood
                 </th>
+                <th className="text-left pb-3 px-2 hidden lg:table-cell" scope="col">
+                  Mistake
+                </th>
+                <th className="text-center pb-3 px-2 hidden lg:table-cell" scope="col">
+                  Rule
+                </th>
                 <th className="text-right pb-3 px-2" scope="col">
                   Replay
                 </th>
@@ -288,8 +297,8 @@ export default function TradeTable() {
             </thead>
             <tbody>
               {trades.map((t) => (
+                <React.Fragment key={t.id}>
                 <tr
-                  key={t.id}
                   className="border-b border-border/30 hover:bg-bg-hover transition-colors"
                 >
                   <td className="py-2 pr-2 text-gray-400 text-xs font-mono whitespace-nowrap">
@@ -342,7 +351,7 @@ export default function TradeTable() {
                     <select
                       value={t.mood || ""}
                       onChange={(e) =>
-                        handleMoodChange(t.id, e.target.value)
+                        handleFieldChange(t.id, "mood", e.target.value)
                       }
                       className="bg-transparent text-xs text-gray-400 border-0 focus:ring-0 cursor-pointer"
                     >
@@ -350,18 +359,89 @@ export default function TradeTable() {
                       <option value="confident">😎 Confident</option>
                       <option value="calm">😌 Calm</option>
                       <option value="fearful">😰 Fearful</option>
+                      <option value="anxious">😟 Anxious</option>
                       <option value="fomo">🔥 FOMO</option>
                       <option value="revenge">😤 Revenge</option>
+                      <option value="greedy">🤑 Greedy</option>
                       <option value="bored">😑 Bored</option>
+                      <option value="neutral">😐 Neutral</option>
                     </select>
                   </td>
-                  <td className="py-2 px-2 text-right">
-                    <Link
-                      to={`/replay/${t.id}`}
-                      className="text-accent hover:underline text-xs"
+                  <td className="py-2 px-2 hidden lg:table-cell">
+                    <select
+                      value={t.mistake_category || ""}
+                      onChange={(e) =>
+                        handleFieldChange(t.id, "mistake_category", e.target.value)
+                      }
+                      className="bg-transparent text-xs text-gray-400 border-0 focus:ring-0 cursor-pointer"
                     >
-                      Replay
-                    </Link>
+                      <option value="">—</option>
+                      <option value="none">None</option>
+                      <option value="fomo_entry">FOMO Entry</option>
+                      <option value="revenge">Revenge</option>
+                      <option value="early_exit">Early Exit</option>
+                      <option value="late_exit">Late Exit</option>
+                      <option value="no_stop_loss">No SL</option>
+                      <option value="moved_stop_loss">Moved SL</option>
+                      <option value="oversized">Oversized</option>
+                      <option value="undersized">Undersized</option>
+                      <option value="chased">Chased</option>
+                      <option value="ignored_signal">Ignored Signal</option>
+                      <option value="overtraded">Overtraded</option>
+                    </select>
+                  </td>
+                  <td className="py-2 px-2 text-center hidden lg:table-cell">
+                    <button
+                      onClick={() =>
+                        handleFieldChange(
+                          t.id,
+                          "rule_followed",
+                          t.rule_followed === true ? false : t.rule_followed === false ? null : true,
+                        )
+                      }
+                      className={`text-xs font-medium px-1.5 py-0.5 rounded transition-colors ${
+                        t.rule_followed === true
+                          ? "bg-win/15 text-win"
+                          : t.rule_followed === false
+                            ? "bg-loss/15 text-loss"
+                            : "text-gray-600 hover:text-gray-400"
+                      }`}
+                      title={
+                        t.rule_followed === true
+                          ? "Rule followed — click to mark broken"
+                          : t.rule_followed === false
+                            ? "Rule broken — click to clear"
+                            : "Click to mark rule followed"
+                      }
+                    >
+                      {t.rule_followed === true ? "Yes" : t.rule_followed === false ? "No" : "—"}
+                    </button>
+                  </td>
+                  <td className="py-2 px-2 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => {
+                          if (expandedId === t.id) {
+                            setExpandedId(null);
+                          } else {
+                            setExpandedId(t.id);
+                            setEditingReason(t.reason || "");
+                          }
+                        }}
+                        className="text-gray-600 hover:text-gray-300 transition-colors"
+                        title="Trade details"
+                      >
+                        <svg className={`w-3.5 h-3.5 transition-transform ${expandedId === t.id ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      <Link
+                        to={`/replay/${t.id}`}
+                        className="text-accent hover:underline text-xs"
+                      >
+                        Replay
+                      </Link>
+                    </div>
                   </td>
                   <td className="py-2 pl-2">
                     <button
@@ -387,6 +467,52 @@ export default function TradeTable() {
                     </button>
                   </td>
                 </tr>
+                {expandedId === t.id && (
+                  <tr className="bg-bg-hover/50">
+                    <td colSpan={12} className="px-4 py-3">
+                      <div className="flex flex-col sm:flex-row gap-4">
+                        <div className="flex-1">
+                          <label className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-1 block">
+                            Reason for Trade
+                          </label>
+                          <input
+                            type="text"
+                            value={editingReason}
+                            onChange={(e) => setEditingReason(e.target.value)}
+                            onBlur={() => {
+                              if (editingReason !== (t.reason || "")) {
+                                handleFieldChange(t.id, "reason", editingReason);
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                handleFieldChange(t.id, "reason", editingReason);
+                                (e.target as HTMLInputElement).blur();
+                              }
+                            }}
+                            placeholder="e.g. Break of structure on 15m, confluence with supply zone"
+                            className="w-full px-3 py-1.5 text-sm rounded-lg bg-bg-primary border border-border text-white placeholder-gray-600 focus:outline-none focus:border-accent"
+                          />
+                        </div>
+                        <div className="flex gap-4 sm:gap-6 text-xs">
+                          <div>
+                            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold block mb-1">Duration</span>
+                            <span className="text-gray-300">{t.duration_minutes ? `${Math.round(t.duration_minutes)}m` : "—"}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold block mb-1">Fees</span>
+                            <span className="text-gray-300">{t.fees ? `₹${t.fees.toFixed(2)}` : "—"}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold block mb-1">Notes</span>
+                            <span className="text-gray-400 max-w-[200px] truncate block">{t.notes || "—"}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>
