@@ -1,6 +1,9 @@
 """Analytics API — thin routes, all logic in AnalyticsService."""
 from __future__ import annotations
 
+from datetime import datetime, timezone as tz_mod
+from typing import Optional
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,11 +22,27 @@ def _tz(user: User, tz: int = None) -> int:
 
 @router.get("/full")
 async def full_analytics(
-    tz: int = Query(None), db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user),
+    tz: int = Query(None),
+    from_date: Optional[str] = Query(None),
+    to_date: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
-    from dataclasses import asdict
-    trades = await trade_service.get_user_trades(db, user, limit=10000)
+    trades = await trade_service.get_user_trades(db, user)
     tz_val = _tz(user, tz)
+
+    if from_date:
+        try:
+            from_dt = datetime.fromisoformat(from_date).replace(tzinfo=tz_mod.utc)
+            trades = [t for t in trades if t.timestamp and t.timestamp >= from_dt]
+        except ValueError:
+            pass
+    if to_date:
+        try:
+            to_dt = datetime.fromisoformat(to_date).replace(tzinfo=tz_mod.utc)
+            trades = [t for t in trades if t.timestamp and t.timestamp <= to_dt]
+        except ValueError:
+            pass
 
     from app.engine.analytics import TradeAnalytics
     ta = TradeAnalytics()

@@ -110,7 +110,7 @@ export default function Settings() {
   const handleDeleteAll = async () => {
     setDeleting(true);
     try {
-      await api.delete("/trades");
+      await api.delete("/trades?confirm=yes");
       toast("All trades deleted", "success");
       setDeleteConfirm(false);
     } catch {

@@ -30,9 +30,7 @@ export default function Upload() {
       formData.append("file", files[0]);
 
       try {
-        const { data } = await api.post(`/trades/upload?broker=${broker}`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        const { data } = await api.post(`/trades/upload?broker=${broker}`, formData);
         setResult(data);
         toast(`${data.imported} trades imported successfully!`, "success");
         setTimeout(() => navigate("/dashboard"), 1500);

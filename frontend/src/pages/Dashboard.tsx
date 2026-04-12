@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api/client";
 import { useAuth } from "../store/auth";
@@ -246,8 +246,14 @@ export default function Dashboard() {
   }, [activeTab]);
 
   useEffect(() => {
+    setLoading(true);
+    const params = new URLSearchParams();
+    const { from } = getDateRangeBounds(dateRange);
+    if (from) {
+      params.set("from_date", from.toISOString());
+    }
     api
-      .get("/analytics/full")
+      .get(`/analytics/full?${params.toString()}`)
       .then(({ data }) => setRawAnalytics(data))
       .catch((err: unknown) => {
         const msg =
@@ -256,7 +262,7 @@ export default function Dashboard() {
         toast(msg, "error");
       })
       .finally(() => setLoading(false));
-  }, [toast]);
+  }, [toast, dateRange]);
 
   useEffect(() => {
     if (!selectedSymbol) { setChartTrades([]); return; }
@@ -265,30 +271,8 @@ export default function Dashboard() {
       .catch(() => setChartTrades([]));
   }, [selectedSymbol]);
 
-  // Date-range-aware analytics: recompute overview from equity curve data
-  const { analytics, filteredEquityCurve } = useMemo(() => {
-    if (!rawAnalytics) return { analytics: null, filteredEquityCurve: [] };
-    if (dateRange === "all") {
-      return {
-        analytics: rawAnalytics,
-        filteredEquityCurve: rawAnalytics.equity_curve?.cumulative_pnl ?? [],
-      };
-    }
-
-    const { from } = getDateRangeBounds(dateRange);
-    if (!from) {
-      return {
-        analytics: rawAnalytics,
-        filteredEquityCurve: rawAnalytics.equity_curve?.cumulative_pnl ?? [],
-      };
-    }
-
-    const filteredCurve = (rawAnalytics.equity_curve?.cumulative_pnl ?? []).filter(
-      (pt) => new Date(pt.date) >= from
-    );
-
-    return { analytics: rawAnalytics, filteredEquityCurve: filteredCurve };
-  }, [rawAnalytics, dateRange]);
+  const analytics = rawAnalytics;
+  const filteredEquityCurve = rawAnalytics?.equity_curve?.cumulative_pnl ?? [];
 
   const o = analytics?.overview;
   const isEmpty = !o || !o.total_trades;

@@ -1,4 +1,9 @@
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-limiter = Limiter(key_func=get_remote_address, enabled=False)
+from app.config import get_settings
+
+settings = get_settings()
+_enabled = settings.environment != "testing"
+
+limiter = Limiter(key_func=get_remote_address, enabled=_enabled)

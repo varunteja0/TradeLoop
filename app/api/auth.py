@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
 from app.dependencies import get_current_user
+from app.rate_limit import limiter
 from app.models.user import User
 from app.schemas.auth import (
     RegisterRequest, LoginRequest, AuthResponse, UserOut,
@@ -28,6 +29,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
 async def register(request: Request, req: RegisterRequest, db: AsyncSession = Depends(get_db)):
     email_norm = normalize_email(str(req.email))
     result = await db.execute(select(User).where(func.lower(User.email) == email_norm))
@@ -56,6 +58,7 @@ async def register(request: Request, req: RegisterRequest, db: AsyncSession = De
 
 
 @router.post("/login", response_model=AuthResponse)
+@limiter.limit("15/minute")
 async def login(request: Request, req: LoginRequest, db: AsyncSession = Depends(get_db)):
     email_norm = normalize_email(str(req.email))
     result = await db.execute(select(User).where(func.lower(User.email) == email_norm))
@@ -138,6 +141,7 @@ async def change_password(
 
 
 @router.post("/forgot-password")
+@limiter.limit("5/minute")
 async def forgot_password(request: Request, email: EmailStr = Body(..., embed=True), db: AsyncSession = Depends(get_db)):
     """Send password reset email."""
     from app.services.email_service import EmailService

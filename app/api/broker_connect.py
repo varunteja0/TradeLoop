@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +11,7 @@ from app.db import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.services import broker_svc as broker_service
+from app.services.background import run_post_upload
 
 router = APIRouter(prefix="/broker", tags=["broker-connect"])
 
@@ -38,17 +39,23 @@ async def list_connections(db: AsyncSession = Depends(get_db), user: User = Depe
 
 @router.post("/{connection_id}/sync")
 async def sync_trades(
-    connection_id: str, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user),
+    connection_id: str,
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     connection = await broker_service.get_connection(db, user, connection_id)
     if not connection:
         raise HTTPException(status_code=404, detail="Connection not found")
     try:
-        return await broker_service.sync_trades(db, user, connection)
+        result = await broker_service.sync_trades(db, user, connection)
     except PermissionError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except ConnectionError as e:
         raise HTTPException(status_code=502, detail=str(e))
+
+    background_tasks.add_task(run_post_upload, user.id)
+    return result
 
 
 @router.delete("/{connection_id}")

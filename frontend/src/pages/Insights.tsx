@@ -286,15 +286,18 @@ export default function Insights() {
   }, []);
 
   useEffect(() => {
+    const extractMsg = (err: unknown) =>
+      (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+      "Failed to load";
+
     Promise.all([
-      api.get("/insights/full").then(({ data }) => setData(data)).catch(() => null),
-      api.get("/insights/alerts").then(({ data }) => setAlerts(data)).catch(() => null),
-    ]).catch((err: unknown) => {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
-        "Failed to load insights";
-      setError(msg);
-    }).finally(() => setLoading(false));
+      api.get("/insights/full").then(({ data }) => setData(data)).catch((err) => {
+        setError((prev) => prev || extractMsg(err));
+      }),
+      api.get("/insights/alerts").then(({ data }) => setAlerts(data)).catch((err) => {
+        setError((prev) => prev || extractMsg(err));
+      }),
+    ]).finally(() => setLoading(false));
   }, []);
 
   const sortedInsights = (data?.insights ?? [])
