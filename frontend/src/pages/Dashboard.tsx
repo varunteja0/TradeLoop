@@ -524,7 +524,7 @@ export default function Dashboard() {
                 <div className="space-y-4">
                   <SymbolTable perSymbol={analytics.symbols.per_symbol} onSymbolClick={(sym) => setSelectedSymbol(sym === selectedSymbol ? null : sym)} selectedSymbol={selectedSymbol} />
                   {selectedSymbol && (
-                    <LiveChart symbol={selectedSymbol} height={350} />
+                    <LiveChart symbol={selectedSymbol} height={620} />
                   )}
                   {selectedSymbol && chartTrades.length > 0 && (
                     <TradeChart trades={chartTrades} symbol={selectedSymbol} />

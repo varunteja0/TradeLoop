@@ -91,3 +91,10 @@ body {
 .animate-glow {
   animation: glow-pulse 3s ease-in-out infinite;
 }
+
+/* TradingView embed: ensure iframe fills measured container (some themes collapse height). */
+.live-chart-host .tradingview-widget-container__widget iframe {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 480px;
+}

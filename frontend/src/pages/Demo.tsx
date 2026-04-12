@@ -305,7 +305,7 @@ export default function Demo() {
           <EquityCurve data={DEMO_DATA.equity_curve.cumulative_pnl} />
         )}
 
-        <LiveChart symbol="NSE:NIFTY" height={400} />
+        <LiveChart symbol="NSE:NIFTY" height={620} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div>
