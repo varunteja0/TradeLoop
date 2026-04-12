@@ -468,8 +468,6 @@ export default function Dashboard() {
                     <EquityCurve data={filteredEquityCurve} />
                   )}
 
-                  <LiveChart symbol="NSE:NIFTY" height={400} />
-
                   {analytics?.risk_metrics && (
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <MetricCard
@@ -526,7 +524,7 @@ export default function Dashboard() {
                 <div className="space-y-4">
                   <SymbolTable perSymbol={analytics.symbols.per_symbol} onSymbolClick={(sym) => setSelectedSymbol(sym === selectedSymbol ? null : sym)} selectedSymbol={selectedSymbol} />
                   {selectedSymbol && (
-                    <LiveChart symbol={`NSE:${selectedSymbol}`} height={350} />
+                    <LiveChart symbol={selectedSymbol} height={350} />
                   )}
                   {selectedSymbol && chartTrades.length > 0 && (
                     <TradeChart trades={chartTrades} symbol={selectedSymbol} />

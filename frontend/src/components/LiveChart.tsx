@@ -5,6 +5,21 @@ interface Props {
   height?: number;
 }
 
+function resolveSymbol(raw: string): string {
+  if (raw.includes(":")) return raw;
+  const upper = raw.toUpperCase();
+  const forexPairs = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD", "EURGBP", "EURJPY", "GBPJPY"];
+  const metals = ["XAUUSD", "XAGUSD", "GOLD", "SILVER"];
+  const oil = ["USOIL", "UKOIL", "WTICOUSD", "BCOUSD", "CRUDEOIL"];
+  const crypto = ["BTCUSD", "ETHUSD", "BTCUSDT", "ETHUSDT"];
+  if (forexPairs.includes(upper)) return `FX:${upper}`;
+  if (metals.includes(upper)) return `OANDA:${upper}`;
+  if (oil.includes(upper)) return `TVC:${upper}`;
+  if (crypto.includes(upper)) return `BITSTAMP:${upper}`;
+  if (upper === "NIFTY" || upper === "BANKNIFTY") return `NSE:${upper}`;
+  return `NSE:${upper}`;
+}
+
 function LiveChartInner({ symbol = "NSE:NIFTY", height = 500 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -15,9 +30,10 @@ function LiveChartInner({ symbol = "NSE:NIFTY", height = 500 }: Props) {
     script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
     script.async = true;
     script.type = "text/javascript";
+    const resolved = resolveSymbol(symbol);
     script.textContent = JSON.stringify({
       autosize: true,
-      symbol: symbol,
+      symbol: resolved,
       interval: "5",
       timezone: "Asia/Kolkata",
       theme: "dark",
